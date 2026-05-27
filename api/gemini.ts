@@ -1,7 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 
 // API anahtarı - kullanıcının verdiği geçerli anahtar
-const apiKey = "AIzaSyByAxI64OoS1NRnOTcz5GE7Jv0oJbXLpg4";
+const apiKey = ";
 // const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
 
 if (!apiKey || typeof apiKey !== 'string') {
