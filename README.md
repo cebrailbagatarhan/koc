@@ -1,50 +1,78 @@
-# Welcome to your Expo app 👋
+# KoçumAI
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+KoçumAI, farklı eğitim seviyelerinde ders seçimi, konu anlatımı/sohbet ve soru çözümü akışlarını deneyen Expo Router tabanlı bir mobil eğitim prototipidir.
 
-## Get started
+> **Durum:** Deneysel prototip. İlkokul, ortaokul, lise ve ALES navigasyonu uygulanmıştır. AI özellikleri bu repository'de bulunan bir model değildir; güvenilir bir backend proxy gerektirir ve proxy yapılandırılmadığında güvenli biçimde hata verir.
 
-1. Install dependencies
+## Uygulanan Akış
 
-   ```bash
-   npm install
-   ```
+1. Eğitim seviyesi seçilir: İlkokul, Ortaokul, Lise veya ALES.
+2. Seviyeye göre ders seçilir.
+3. Kullanıcı konu anlatımı/sohbet ya da soru çözümü ekranına gider.
+4. Sohbet ekranı metin ve isteğe bağlı görseli backend proxy'ye gönderir.
+5. Quiz ekranı proxy'nin doğrulanmış soru yanıtını gösterir.
 
-2. Start the app
+Dosya tabanlı route yapısı:
 
-   ```bash
-   npx expo start
-   ```
+- app/(tabs)/index.tsx: seviye seçimi
+- app/level/[levelName].tsx: seviyeye göre dersler
+- app/course/[levelName]/[courseName].tsx: konu anlatımı veya quiz seçimi
+- app/chat/[levelName]/[courseName].tsx: metin/görsel sohbet
+- app/quiz/[levelName]/[courseName].tsx: soru çözümü
+- api/gemini.ts: istemci ile güvenilir proxy arasındaki sözleşme
 
-In the output, you'll find options to open the app in a
+Ders listeleri şu an kaynak kod içinde sabittir; bir içerik yönetim sistemi veya doğrulanmış müfredat veri tabanı yoktur.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Kurulum
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Node.js ve Expo geliştirme ortamı gerekir.
 
-## Get a fresh project
+~~~bash
+npm ci
+cp .env.example .env
+npm start
+~~~
 
-When you're ready, run:
+Android, iOS veya web hedefi Expo arayüzünden seçilebilir.
 
-```bash
-npm run reset-project
-```
+## AI Güvenlik Mimarisi
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Mobil uygulamada Gemini/Google sağlayıcı anahtarı veya doğrudan sağlayıcı SDK'sı bulunmamalıdır. .env yalnız public proxy URL'sini içerir:
 
-## Learn more
+~~~dotenv
+EXPO_PUBLIC_AI_PROXY_URL=https://your-ai-proxy.example.com
+~~~
 
-To learn more about developing your project with Expo, look at the following resources:
+Production URL'si HTTPS olmalıdır; düz HTTP yalnız localhost ve 127.0.0.1 için kabul edilir. Sağlayıcı anahtarı backend secret store'da tutulmalı; backend authentication, kullanıcı/IP rate limit'i, request-size sınırı, şema doğrulama ve hassas log redaction uygulamalıdır.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+İstemcinin beklediği endpoint ve yanıt şemaları [proxy sözleşmesinde](docs/ai-proxy.md) tanımlıdır. Bu backend repository'ye dahil değildir.
 
-## Join the community
+## Kontroller
 
-Join our community of developers creating universal apps.
+~~~bash
+npm run lint
+npm run test:security
+~~~
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+test:security, istemci kaynaklarına sağlayıcı credential'ı, public provider-key değişkeni veya doğrudan sağlayıcı SDK'sı eklenmesini engeller.
+
+## Veri ve Gizlilik
+
+Sohbet ekranındaki görseller gönderilmeden önce istemcide Base64'e çevrilir ve proxy'ye aktarılır. Production kullanımı öncesinde açık kullanıcı rızası, saklama süresi, içerik silme politikası ve çocuklara ait veriler için hukuki/ürün incelemesi gerekir. Proxy, ham istemleri ve görselleri varsayılan olarak loglamamalıdır.
+
+## Bilinen Sınırlar
+
+- Production AI backend'i yoktur; AI akışları proxy olmadan çalışmaz.
+- Eğitim içeriğinin pedagojik doğrulaması ve kaynak gösterimi yapılmamıştır.
+- Kullanıcı hesabı, ilerleme senkronizasyonu ve öğretmen paneli yoktur.
+- Component/E2E testleri ile gerçek cihaz ekran görüntüleri henüz eklenmemiştir.
+- Erişilebilirlik ve çocuk güvenliği incelemesi tamamlanmamıştır.
+
+## Yol Haritası
+
+- Gerçek cihaz ekran görüntüleri ve kısa demo
+- Authentication/rate-limit içeren server-side AI proxy
+- Müfredat sürümü, kaynak ve editoryal onay bilgisi olan içerik modeli
+- Component ve navigasyon testleri
+- Erişilebilirlik, gizlilik ve çocuk güvenliği incelemesi
+- Öğrenci ilerleme takibi ve veli/öğretmen görünümü

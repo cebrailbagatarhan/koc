@@ -1,14 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
-
-// API anahtarı - kullanıcının verdiği geçerli anahtar
-const apiKey = ";
-// const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-
-if (!apiKey || typeof apiKey !== 'string') {
-  throw new Error('Gemini API key is not set correctly.');
-}
-
-const ai = new GoogleGenAI({ apiKey });
+const rawProxyUrl = process.env.EXPO_PUBLIC_AI_PROXY_URL?.trim();
 
 interface QuizQuestion {
   question: string;
@@ -21,86 +11,108 @@ interface Explanation {
   points: string[];
 }
 
-// Gelen metni temizleyip JSON'a çeviren yardımcı fonksiyon
-const parseGeminiResponse = <T>(text: string | undefined): T | null => {
+export interface ChatPart {
+  text?: string;
+  inlineData?: {
+    data: string;
+    mimeType: string;
+  };
+}
+
+export interface ChatSession {
+  sendMessage(parts: ChatPart[]): Promise<{
+    response: {
+      text(): string;
+    };
+  }>;
+}
+
+const getProxyUrl = (): string => {
+  if (!rawProxyUrl) {
+    throw new Error(
+      'AI proxy is not configured. Set EXPO_PUBLIC_AI_PROXY_URL to a trusted backend URL.'
+    );
+  }
+
+  const normalized = rawProxyUrl.replace(/\/+$/, '');
+  const parsed = new URL(normalized);
+  const isLocal = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+
+  if (parsed.protocol !== 'https:' && !isLocal) {
+    throw new Error('AI proxy must use HTTPS outside local development.');
+  }
+
+  return normalized;
+};
+
+const callProxy = async <T>(operation: string, payload: unknown): Promise<T> => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+
   try {
-    if (!text) {
-      console.error('No text provided to parseGeminiResponse');
-      return null;
+    const response = await fetch(`${getProxyUrl()}/v1/${operation}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI proxy request failed with status ${response.status}.`);
     }
-    // ```json ... ``` formatını temizle
-    const cleanedText = text.replace(/^```json\s*|```$/g, '');
-    // Sadece { ile } arasını almayı dene
-    const startIndex = cleanedText.indexOf('{');
-    const endIndex = cleanedText.lastIndexOf('}');
-    if (startIndex === -1 || endIndex === -1) {
-      console.error('No JSON object found in the response:', cleanedText);
-      return null;
-    }
-    const jsonString = cleanedText.substring(startIndex, endIndex + 1);
-    return JSON.parse(jsonString) as T;
-  } catch (error) {
-    console.error('Error parsing JSON from Gemini response:', error);
-    console.error('Problematic text:', text);
-    return null;
+
+    return (await response.json()) as T;
+  } finally {
+    clearTimeout(timeout);
   }
 };
 
-// --- YENİ: Sohbet özelliği için fonksiyon (geçici çözüm) ---
-export const startChatSession = async (level: string) => {
-  // TODO: Yeni kütüphanenin chat API'sini öğren ve düzelt
-  // Şimdilik basit bir mock döndürüyoruz
-  return {
-    sendMessage: async (parts: any[]) => {
-      const text = parts.find(p => p.text)?.text || '';
-      const prompt = `
-        Sen bir eğitim asistanısın. Cevaplarını ${level} seviyesindeki bir öğrenciye göre ayarla.
-        Kullanıcı mesajı: ${text}
-      `;
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every(item => typeof item === 'string');
 
-      try {
-        const result = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: prompt,
-        });
-        return {
-          response: {
-            text: () => result.text
-          }
-        };
-      } catch (error) {
-        console.error('Chat error:', error);
-        throw error;
-      }
-    }
-  };
+const isQuizQuestion = (value: unknown): value is QuizQuestion => {
+  if (!value || typeof value !== 'object') return false;
+  const question = value as Partial<QuizQuestion>;
+  return (
+    typeof question.question === 'string' &&
+    isStringArray(question.options) &&
+    question.options.length >= 2 &&
+    typeof question.correctAnswer === 'string' &&
+    question.options.includes(question.correctAnswer)
+  );
 };
 
+const isExplanation = (value: unknown): value is Explanation => {
+  if (!value || typeof value !== 'object') return false;
+  const explanation = value as Partial<Explanation>;
+  return typeof explanation.title === 'string' && isStringArray(explanation.points);
+};
+
+export const startChatSession = (level: string): ChatSession => ({
+  sendMessage: async (parts: ChatPart[]) => {
+    const result = await callProxy<{ text?: unknown }>('chat', { level, parts });
+    const text = result.text;
+    if (typeof text !== 'string') {
+      throw new Error('AI proxy returned an invalid chat response.');
+    }
+
+    return {
+      response: {
+        text: () => text,
+      },
+    };
+  },
+});
 
 export const generateQuizQuestion = async (
   level: string,
   course: string
 ): Promise<QuizQuestion | null> => {
-  const prompt = `
-    Lütfen aşağıdaki formatı kullanarak bir JSON nesnesi oluştur:
-    {
-      "question": "soru metni",
-      "options": ["şık A", "şık B", "şık C", "şık D"],
-      "correctAnswer": "doğru şık metni"
-    }
-
-    Konu: ${level} seviyesi, ${course} dersi.
-    Soru, bu seviyeye ve derse uygun olmalı. Sadece JSON nesnesini döndür, başka hiçbir metin ekleme.
-  `;
-
   try {
-    const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-    });
-    const text = result.text;
-
-    return parseGeminiResponse<QuizQuestion>(text);
+    const result = await callProxy<unknown>('quiz-question', { level, course });
+    return isQuizQuestion(result) ? result : null;
   } catch (error) {
     console.error('Error generating quiz question:', error);
     return null;
@@ -111,25 +123,9 @@ export const generateExplanation = async (
   level: string,
   course: string
 ): Promise<Explanation | null> => {
-  const prompt = `
-    Lütfen aşağıdaki formatı kullanarak bir JSON nesnesi oluştur:
-    {
-      "title": "konu başlığı",
-      "points": ["anahtar nokta 1", "anahtar nokta 2", "anahtar nokta 3"]
-    }
-
-    Konu: ${level} seviyesi, ${course} dersi hakkında kısa ve anlaşılır bir konu özeti.
-    Başlık konuyu özetlemeli, noktalar ise konunun en önemli 3-5 maddesini içermelidir.
-    Sadece JSON nesnesini döndür, başka hiçbir metin ekleme.
-  `;
-
   try {
-    const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-    });
-    const text = result.text;
-    return parseGeminiResponse<Explanation>(text);
+    const result = await callProxy<unknown>('explanation', { level, course });
+    return isExplanation(result) ? result : null;
   } catch (error) {
     console.error('Error generating explanation:', error);
     return null;

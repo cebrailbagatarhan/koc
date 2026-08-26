@@ -1,5 +1,5 @@
-import { startChatSession } from '@/api/gemini';
-import * as FileSystem from 'expo-file-system';
+import { startChatSession, type ChatPart, type ChatSession } from '@/api/gemini';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -11,17 +11,9 @@ interface Message {
   imageUri?: string; // Kullanıcının gönderdiği resimler için
 }
 
-interface Part {
-  text?: string;
-  inlineData?: {
-    data: string;
-    mimeType: string;
-  };
-}
-
 // Resmi Base64'e çeviren ve MIME tipini belirleyen yardımcı fonksiyon
-const imageToGeminiPart = async (uri: string): Promise<Part> => {
-  const fileInfo = await FileSystem.getInfoAsync(uri, { size: false, md5: false });
+const imageToGeminiPart = async (uri: string): Promise<ChatPart> => {
+  const fileInfo = await FileSystem.getInfoAsync(uri, { md5: false });
   if (!fileInfo.exists) {
     throw new Error("Dosya bulunamadı.");
   }
@@ -80,7 +72,7 @@ export default function ChatScreen() {
     setPickedImage(null);
 
     try {
-      const parts: Part[] = [{ text: inputText }];
+      const parts: ChatPart[] = [{ text: inputText }];
       if (imageToSend) {
         const imagePart = await imageToGeminiPart(imageToSend.uri);
         parts.push(imagePart);
