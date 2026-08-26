@@ -1,5 +1,5 @@
 import { startChatSession, type ChatPart, type ChatSession } from '@/api/gemini';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -13,7 +13,7 @@ interface Message {
 
 // Resmi Base64'e çeviren ve MIME tipini belirleyen yardımcı fonksiyon
 const imageToGeminiPart = async (uri: string): Promise<ChatPart> => {
-  const fileInfo = await FileSystem.getInfoAsync(uri, { size: false, md5: false });
+  const fileInfo = await FileSystem.getInfoAsync(uri, { md5: false });
   if (!fileInfo.exists) {
     throw new Error("Dosya bulunamadı.");
   }
