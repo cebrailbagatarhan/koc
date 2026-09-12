@@ -4,23 +4,39 @@ import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { LEVELS } from '@/data/courseCatalog';
+import {
+  getDailyPlan,
+  getLastTopicVisit,
+  type DailyPlan,
+  type LastTopicVisit,
+} from '@/storage/coachStore';
 import { getActivityStats, type ActivityStats } from '@/storage/learningStore';
 import { getReviewDashboard, type ReviewDashboard } from '@/storage/reviewStore';
 
 const initialStats: ActivityStats = { streakDays: 0, lastStudyDate: null, totalStudyActions: 0 };
 const initialReview: ReviewDashboard = { dueCount: 0, trackedCount: 0, nextDueAt: null, weakCourses: [] };
+const initialPlan: DailyPlan = { date: '', tasks: [], completedCount: 0, totalMinutes: 0 };
 
 export default function HomeScreen() {
   const [stats, setStats] = useState<ActivityStats>(initialStats);
   const [review, setReview] = useState<ReviewDashboard>(initialReview);
+  const [plan, setPlan] = useState<DailyPlan>(initialPlan);
+  const [lastTopic, setLastTopic] = useState<LastTopicVisit | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      Promise.all([getActivityStats(), getReviewDashboard()]).then(([nextStats, nextReview]) => {
+      Promise.all([
+        getActivityStats(),
+        getReviewDashboard(),
+        getDailyPlan(),
+        getLastTopicVisit(),
+      ]).then(([nextStats, nextReview, nextPlan, nextLastTopic]) => {
         if (!active) return;
         setStats(nextStats);
         setReview(nextReview);
+        setPlan(nextPlan);
+        setLastTopic(nextLastTopic);
       });
       return () => {
         active = false;
@@ -29,6 +45,9 @@ export default function HomeScreen() {
   );
 
   const weakest = review.weakCourses[0];
+  const planPercent = plan.tasks.length
+    ? Math.round((plan.completedCount / plan.tasks.length) * 100)
+    : 0;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -36,7 +55,7 @@ export default function HomeScreen() {
         <Text style={styles.eyebrow}>KOÇ · ÇEVRİMDIŞI ÖĞRENME</Text>
         <Text style={styles.title}>Bugün ne çalışıyoruz?</Text>
         <Text style={styles.subtitle}>
-          Dersler, testler, kaynaklar ve ilerleme cihazında çalışır. AI entegrasyonu daha sonra eklenebilir.
+          Dersler, kişisel plan, kaynaklar ve ilerleme cihazında çalışır. AI entegrasyonu zorunlu değildir.
         </Text>
 
         <View style={styles.statsRow}>
@@ -50,6 +69,48 @@ export default function HomeScreen() {
           </View>
         </View>
       </View>
+
+      <TouchableOpacity
+        activeOpacity={0.88}
+        style={styles.planCard}
+        onPress={() => router.push('/plan')}>
+        <View style={styles.planTopRow}>
+          <View>
+            <Text style={styles.planEyebrow}>BUGÜNÜN PLANI</Text>
+            <Text style={styles.planTitle}>
+              {plan.tasks.length > 0
+                ? `${plan.completedCount}/${plan.tasks.length} görev tamamlandı`
+                : 'İlk çalışma verini oluştur'}
+            </Text>
+          </View>
+          <Text style={styles.planBadge}>{plan.tasks.length > 0 ? `${planPercent}%` : '→'}</Text>
+        </View>
+        <Text style={styles.planText}>
+          {plan.tasks.length > 0
+            ? `Yaklaşık ${plan.totalMinutes} dk · tekrar + zayıf konu + ilerleme dengesi`
+            : 'Bir konuya başlayınca Koç günlük çalışma rotanı otomatik hazırlayacak.'}
+        </Text>
+        <View style={styles.planTrack}>
+          <View style={[styles.planFill, { width: `${planPercent}%` }]} />
+        </View>
+      </TouchableOpacity>
+
+      {lastTopic ? (
+        <TouchableOpacity
+          activeOpacity={0.88}
+          style={styles.continueCard}
+          onPress={() => router.push(`/topic/${lastTopic.levelName}/${lastTopic.courseName}/${lastTopic.topicName}`)}>
+          <View style={styles.continueIconWrap}>
+            <Text style={styles.continueIcon}>▶️</Text>
+          </View>
+          <View style={styles.continueBody}>
+            <Text style={styles.continueEyebrow}>DEVAM ET</Text>
+            <Text style={styles.continueTitle}>{lastTopic.topicName}</Text>
+            <Text style={styles.continueText}>{lastTopic.courseName} · {lastTopic.levelName}</Text>
+          </View>
+          <Text style={styles.reviewArrow}>→</Text>
+        </TouchableOpacity>
+      ) : null}
 
       <TouchableOpacity
         activeOpacity={0.88}
@@ -72,6 +133,15 @@ export default function HomeScreen() {
           </Text>
         </View>
         <Text style={styles.reviewArrow}>→</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.masteryCard} onPress={() => router.push('/mastery')}>
+        <View>
+          <Text style={styles.masteryEyebrow}>KONU USTALIĞI</Text>
+          <Text style={styles.masteryTitle}>Güçlü ve zayıf konularını aç</Text>
+          <Text style={styles.masteryText}>Quiz doğruluğu, tekrar ve konu kapsamı tek haritada.</Text>
+        </View>
+        <Text style={styles.masteryArrow}>→</Text>
       </TouchableOpacity>
 
       {weakest ? (
@@ -113,6 +183,21 @@ const styles = StyleSheet.create({
   statCard: { flex: 1, backgroundColor: '#2A2647', borderRadius: 16, padding: 14 },
   statValue: { color: '#FFFFFF', fontSize: 18, fontWeight: '800' },
   statLabel: { color: '#BEB8D6', fontSize: 11, marginTop: 2 },
+  planCard: { backgroundColor: '#6552D9', borderRadius: 20, padding: 17, marginBottom: 10 },
+  planTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
+  planEyebrow: { color: '#DCD5FF', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
+  planTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: '900', marginTop: 3 },
+  planBadge: { color: '#6552D9', backgroundColor: '#FFFFFF', minWidth: 42, textAlign: 'center', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, fontWeight: '900' },
+  planText: { color: '#E8E4FF', fontSize: 11, lineHeight: 16, marginTop: 7 },
+  planTrack: { height: 6, backgroundColor: '#7C6CE1', borderRadius: 999, overflow: 'hidden', marginTop: 11 },
+  planFill: { height: '100%', backgroundColor: '#FFFFFF' },
+  continueCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 15, borderWidth: 1, borderColor: '#E7E3F5', flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  continueIconWrap: { width: 48, height: 48, borderRadius: 16, backgroundColor: '#EAF2FF', alignItems: 'center', justifyContent: 'center' },
+  continueIcon: { fontSize: 20 },
+  continueBody: { flex: 1, marginLeft: 12 },
+  continueEyebrow: { color: '#3A6FD8', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
+  continueTitle: { color: '#1D1A34', fontSize: 15, fontWeight: '900', marginTop: 2 },
+  continueText: { color: '#6B6684', fontSize: 10, marginTop: 3 },
   reviewCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#E7E3F5', flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   reviewCardDue: { borderColor: '#D8C1F2', backgroundColor: '#FBF8FF' },
   reviewIconWrap: { width: 48, height: 48, borderRadius: 16, backgroundColor: '#EFE6FA', alignItems: 'center', justifyContent: 'center' },
@@ -122,6 +207,11 @@ const styles = StyleSheet.create({
   reviewTitle: { color: '#1D1A34', fontSize: 16, fontWeight: '900', marginTop: 2 },
   reviewSubtitle: { color: '#6B6684', fontSize: 11, lineHeight: 16, marginTop: 3 },
   reviewArrow: { color: '#9B5DE5', fontSize: 22, fontWeight: '800', marginLeft: 8 },
+  masteryCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#DFF6F4', borderRadius: 17, padding: 14, marginBottom: 10 },
+  masteryEyebrow: { color: '#0E716B', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
+  masteryTitle: { color: '#1D1A34', fontSize: 14, fontWeight: '900', marginTop: 3 },
+  masteryText: { color: '#397A76', fontSize: 10, marginTop: 3 },
+  masteryArrow: { color: '#0E716B', fontSize: 22, fontWeight: '900' },
   coachHint: { backgroundColor: '#FFF5D8', borderRadius: 16, padding: 14, marginBottom: 20, borderWidth: 1, borderColor: '#F4D782' },
   coachHintEyebrow: { color: '#A66B00', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
   coachHintText: { color: '#6B6684', fontSize: 12, lineHeight: 18, marginTop: 4 },
