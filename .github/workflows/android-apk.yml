@@ -32,22 +32,22 @@ jobs:
       - name: Prebuild Android
         run: npx expo prebuild --platform android --non-interactive --clean
 
-      - name: Build debug APK
+      - name: Build ARM64 debug APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon -PreactNativeArchitectures=arm64-v8a
 
       - name: Prepare APK
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist/Koc-v5-test.apk
-          sha256sum dist/Koc-v5-test.apk > dist/Koc-v5-test.apk.sha256
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/Koc-v5-test-arm64.apk
+          sha256sum dist/Koc-v5-test-arm64.apk > dist/Koc-v5-test-arm64.apk.sha256
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Koc-v5-test-apk
+          name: Koc-v5-test-arm64-apk
           path: |
-            dist/Koc-v5-test.apk
-            dist/Koc-v5-test.apk.sha256
+            dist/Koc-v5-test-arm64.apk
+            dist/Koc-v5-test-arm64.apk.sha256
           if-no-files-found: error
           retention-days: 30
