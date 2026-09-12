@@ -177,7 +177,10 @@ export default function ReviewScreen() {
       <View style={styles.questionCard}>
         <Text style={styles.bankBadge}>✓ YEREL SORU BANKASI</Text>
         <Text style={styles.questionText}>{current.question.question}</Text>
-        <QuestionVisual visual={current.question.visual} />
+        <QuestionVisual
+          visual={current.question.visual}
+          hiddenAnswer={selected ? undefined : current.question.correctAnswer}
+        />
       </View>
 
       <View style={styles.options}>
