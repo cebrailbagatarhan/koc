@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { getQuizQuestions, type QuizQuestion } from '@/data/offlineContent';
-import { recordQuizAnswer } from '@/storage/learningStore';
+import { recordQuizOutcome } from '@/storage/reviewStore';
 
 function shuffled<T>(items: T[]) {
   return [...items].sort(() => Math.random() - 0.5);
@@ -27,7 +27,13 @@ export default function QuizScreen() {
     const correct = answer === question.correctAnswer;
     setSelected(answer);
     if (correct) setScore((value) => value + 1);
-    await recordQuizAnswer(levelName, courseName, correct);
+    await recordQuizOutcome({
+      levelName,
+      courseName,
+      questionId: question.id,
+      correct,
+      selectedAnswer: answer,
+    });
   };
 
   const handleNext = () => {
@@ -58,7 +64,9 @@ export default function QuizScreen() {
         <Text style={styles.resultIcon}>{percent >= 70 ? '🎉' : '💪'}</Text>
         <Text style={styles.resultTitle}>{score}/{questionSet.length} doğru</Text>
         <Text style={styles.resultPercent}>%{percent}</Text>
-        <Text style={styles.emptyText}>Sonuç ilerleme ekranına kaydedildi.</Text>
+        <Text style={styles.emptyText}>
+          Sonuç ilerlemeye kaydedildi. Yanlış sorular otomatik tekrar kuyruğuna eklendi.
+        </Text>
       </View>
     );
   }
@@ -106,6 +114,9 @@ export default function QuizScreen() {
             {selected === question.correctAnswer ? 'Doğru ✓' : `Doğru cevap: ${question.correctAnswer}`}
           </Text>
           <Text style={styles.feedbackText}>{question.explanation}</Text>
+          {selected !== question.correctAnswer ? (
+            <Text style={styles.reviewHint}>Bu soru 6 saat sonra tekrar kuyruğunda hazır olacak.</Text>
+          ) : null}
           <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
             <Text style={styles.nextButtonText}>{index === questionSet.length - 1 ? 'Sonucu gör' : 'Sonraki soru'}</Text>
           </TouchableOpacity>
@@ -133,6 +144,7 @@ const styles = StyleSheet.create({
   feedbackCard: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#E7E3F5', marginTop: 16 },
   feedbackTitle: { color: '#1D1A34', fontSize: 15, fontWeight: '800' },
   feedbackText: { color: '#6B6684', fontSize: 12, lineHeight: 18, marginTop: 5 },
+  reviewHint: { color: '#9B5DE5', fontSize: 11, lineHeight: 16, fontWeight: '700', marginTop: 8 },
   nextButton: { backgroundColor: '#1D1A34', borderRadius: 12, padding: 12, alignItems: 'center', marginTop: 13 },
   nextButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 13 },
   centerContainer: { flex: 1, backgroundColor: '#F5F3FB', alignItems: 'center', justifyContent: 'center', padding: 28 },
