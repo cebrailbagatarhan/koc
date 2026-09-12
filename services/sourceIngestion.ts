@@ -11,6 +11,7 @@ const MAX_FILE_SIZE = 25 * 1024 * 1024;
 const MAX_TEXT_FILE_EXTRACT_SIZE = 2 * 1024 * 1024;
 const MAX_PDF_EXTRACT_SIZE = 20 * 1024 * 1024;
 const MAX_EXTRACTED_TEXT_CHARS = 250_000;
+const LETTER = 'A-Za-zÇĞİÖŞÜçğıöşü';
 
 export type TextExtractionStatus =
   | 'extracted'
@@ -58,8 +59,15 @@ function canExtractAsText(fileName: string, mimeType?: string | null) {
 
 function cleanExtractedText(text: string) {
   return text
-    .replace(/\u0000/g, ' ')
+    .normalize('NFKC')
+    .replace(/\u0000|\u200B|\u200C|\u200D|\uFEFF/g, ' ')
+    .replace(/\u00AD/g, '')
+    .replace(/\r/g, '')
+    .replace(new RegExp(`([${LETTER}])-\\n([${LETTER}])`, 'g'), '$1$2')
     .replace(/[\t ]+\n/g, '\n')
+    .replace(/^[ \t]*\d{1,4}[ \t]*$/gm, '')
+    .replace(/\n[ \t]*(?:sayfa|page)[ \t]+\d{1,4}[ \t]*\n/gi, '\n')
+    .replace(/[ \t]{2,}/g, ' ')
     .replace(/\n{4,}/g, '\n\n\n')
     .slice(0, MAX_EXTRACTED_TEXT_CHARS)
     .trim();
