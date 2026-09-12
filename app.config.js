@@ -7,9 +7,10 @@ export default {
     "icon": "./assets/images/icon.png",
     "scheme": "kocumai",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kocumai.app"
     },
     "android": {
       "adaptiveIcon": {
