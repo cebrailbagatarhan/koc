@@ -1,10 +1,10 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { type QuizQuestion } from '@/data/offlineContent';
-import { getQuizQuestionsForTopic } from '@/data/topicQuiz';
 import { completeDailyPlanTopic } from '@/storage/coachStore';
+import { getQuestionsFromDatabase } from '@/storage/questionBankStore';
 import { recordQuizOutcome } from '@/storage/reviewStore';
 
 function shuffled<T>(items: T[]) {
@@ -17,14 +17,33 @@ export default function QuizScreen() {
     courseName: string;
     topicName?: string;
   }>();
-  const questionSet = useMemo(
-    () => shuffled(getQuizQuestionsForTopic(levelName, courseName, topicName)).slice(0, 5),
-    [levelName, courseName, topicName],
-  );
+  const [questionSet, setQuestionSet] = useState<QuizQuestion[]>([]);
+  const [loading, setLoading] = useState(true);
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [finished, setFinished] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setIndex(0);
+    setScore(0);
+    setSelected(null);
+    setFinished(false);
+
+    getQuestionsFromDatabase(levelName, courseName, topicName)
+      .then((questions) => {
+        if (active) setQuestionSet(shuffled(questions).slice(0, 10));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [courseName, levelName, topicName]);
 
   const question: QuizQuestion | undefined = questionSet[index];
   const screenLabel = topicName ? `${courseName ?? 'Ders'} · ${topicName}` : `${courseName ?? 'Ders'} · Quiz`;
@@ -55,16 +74,27 @@ export default function QuizScreen() {
     setSelected(null);
   };
 
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <Stack.Screen options={{ title: screenLabel }} />
+        <Text style={styles.emptyIcon}>🗃️</Text>
+        <Text style={styles.emptyTitle}>Soru bankası hazırlanıyor...</Text>
+        <Text style={styles.emptyText}>APK içindeki doğrulanmış içerik yerel veritabanına yükleniyor.</Text>
+      </View>
+    );
+  }
+
   if (!questionSet.length) {
     return (
       <View style={styles.centerContainer}>
         <Stack.Screen options={{ title: screenLabel }} />
         <Text style={styles.emptyIcon}>🧩</Text>
         <Text style={styles.emptyTitle}>
-          {topicName ? 'Bu konu için yerel soru bankası hazırlanıyor.' : 'Bu ders için yerel soru bankası hazırlanıyor.'}
+          {topicName ? 'Bu konu için doğrulanmış soru henüz yok.' : 'Bu ders için doğrulanmış soru henüz yok.'}
         </Text>
         <Text style={styles.emptyText}>
-          Eğitim akışı API’ye bağlı değil; bu konuya soru eklendiğinde doğrudan burada çalışacak.
+          Koç eksik içeriği yapay olarak doldurmaz. Yeni doğrulanmış içerik paketi geldiğinde SQLite bankasına eklenir.
         </Text>
       </View>
     );
@@ -86,13 +116,15 @@ export default function QuizScreen() {
     );
   }
 
+  if (!question) return null;
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Stack.Screen options={{ title: screenLabel }} />
 
       {topicName ? (
         <View style={styles.topicHeader}>
-          <Text style={styles.topicHeaderLabel}>KONU QUIZİ</Text>
+          <Text style={styles.topicHeaderLabel}>DOĞRULANMIŞ KONU QUIZİ</Text>
           <Text style={styles.topicHeaderTitle}>{topicName}</Text>
         </View>
       ) : null}
@@ -106,6 +138,7 @@ export default function QuizScreen() {
       </View>
 
       <View style={styles.questionCard}>
+        <Text style={styles.bankBadge}>✓ YEREL SORU BANKASI</Text>
         <Text style={styles.questionText}>{question.question}</Text>
       </View>
 
@@ -137,7 +170,7 @@ export default function QuizScreen() {
           </Text>
           <Text style={styles.feedbackText}>{question.explanation}</Text>
           {selected !== question.correctAnswer ? (
-            <Text style={styles.reviewHint}>Bu soru 6 saat sonra tekrar kuyruğunda hazır olacak.</Text>
+            <Text style={styles.reviewHint}>Bu soru tekrar kuyruğuna eklendi.</Text>
           ) : null}
           <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
             <Text style={styles.nextButtonText}>{index === questionSet.length - 1 ? 'Sonucu gör' : 'Sonraki soru'}</Text>
@@ -160,6 +193,7 @@ const styles = StyleSheet.create({
   progressTrack: { height: 7, borderRadius: 999, backgroundColor: '#E7E3F5', marginTop: 10, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: '#FF5C7C' },
   questionCard: { backgroundColor: '#1D1A34', borderRadius: 22, padding: 22, marginTop: 20 },
+  bankBadge: { color: '#64D8CF', fontSize: 9, fontWeight: '900', letterSpacing: 1, marginBottom: 8 },
   questionText: { color: '#FFFFFF', fontSize: 21, lineHeight: 29, fontWeight: '800' },
   options: { marginTop: 14, gap: 9 },
   option: { backgroundColor: '#FFFFFF', borderRadius: 15, padding: 15, borderWidth: 1, borderColor: '#E7E3F5' },
