@@ -1,11 +1,11 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { Stack, router } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
 
-import { type QuizQuestion } from '@/data/offlineContent';
+import { QuestionVisual } from '@/components/question-visual';
 import { completeDailyPlanReview } from '@/storage/coachStore';
-import { getQuestionFromDatabase } from '@/storage/questionBankStore';
+import { getQuestionFromDatabase, type BankQuestion } from '@/storage/questionBankStore';
 import {
   getDueReviewItems,
   getReviewDashboard,
@@ -16,7 +16,7 @@ import {
 
 type QueueEntry = {
   review: ReviewItem;
-  question: QuizQuestion;
+  question: BankQuestion;
 };
 
 const emptyDashboard: ReviewDashboard = {
@@ -49,7 +49,7 @@ export default function ReviewScreen() {
       }),
     );
 
-    setQueue(resolved.filter((entry): entry is QueueEntry => Boolean(entry)));
+    setQueue(resolved.filter((entry): entry is QueueEntry => entry !== null));
     setDashboard(nextDashboard);
     setIndex(0);
     setSelected(null);
@@ -177,6 +177,7 @@ export default function ReviewScreen() {
       <View style={styles.questionCard}>
         <Text style={styles.bankBadge}>✓ YEREL SORU BANKASI</Text>
         <Text style={styles.questionText}>{current.question.question}</Text>
+        <QuestionVisual visual={current.question.visual} />
       </View>
 
       <View style={styles.options}>
