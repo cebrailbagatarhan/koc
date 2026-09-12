@@ -5,11 +5,12 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 
 import { LEVELS } from '@/data/courseCatalog';
 import {
-  getDailyPlan,
   getLastTopicVisit,
   type DailyPlan,
   type LastTopicVisit,
 } from '@/storage/coachStore';
+import { getActiveGoal, getDaysRemaining, getGoalPaceLabel, type StudyGoal } from '@/storage/goalStore';
+import { getGoalAwareDailyPlan } from '@/storage/goalPlanner';
 import { getActivityStats, type ActivityStats } from '@/storage/learningStore';
 import { getReviewDashboard, type ReviewDashboard } from '@/storage/reviewStore';
 
@@ -22,6 +23,7 @@ export default function HomeScreen() {
   const [review, setReview] = useState<ReviewDashboard>(initialReview);
   const [plan, setPlan] = useState<DailyPlan>(initialPlan);
   const [lastTopic, setLastTopic] = useState<LastTopicVisit | null>(null);
+  const [goal, setGoal] = useState<StudyGoal | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -29,14 +31,16 @@ export default function HomeScreen() {
       Promise.all([
         getActivityStats(),
         getReviewDashboard(),
-        getDailyPlan(),
+        getGoalAwareDailyPlan(),
         getLastTopicVisit(),
-      ]).then(([nextStats, nextReview, nextPlan, nextLastTopic]) => {
+        getActiveGoal(),
+      ]).then(([nextStats, nextReview, nextPlan, nextLastTopic, nextGoal]) => {
         if (!active) return;
         setStats(nextStats);
         setReview(nextReview);
         setPlan(nextPlan);
         setLastTopic(nextLastTopic);
+        setGoal(nextGoal);
       });
       return () => {
         active = false;
@@ -48,6 +52,7 @@ export default function HomeScreen() {
   const planPercent = plan.tasks.length
     ? Math.round((plan.completedCount / plan.tasks.length) * 100)
     : 0;
+  const goalDays = goal ? getDaysRemaining(goal.targetDate) : null;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -72,6 +77,27 @@ export default function HomeScreen() {
 
       <TouchableOpacity
         activeOpacity={0.88}
+        style={[styles.goalCard, goal && styles.goalCardActive]}
+        onPress={() => router.push('/goals')}>
+        <View style={styles.goalIconWrap}>
+          <Text style={styles.goalIcon}>{goal ? '🏁' : '🎯'}</Text>
+        </View>
+        <View style={styles.goalBody}>
+          <Text style={styles.goalEyebrow}>{goal ? getGoalPaceLabel(goal.targetDate).toUpperCase() : 'ÇALIŞMA HEDEFİ'}</Text>
+          <Text style={styles.goalTitle}>
+            {goal ? `${goal.title} · ${goalDays} gün` : 'Bir sınav veya tarih hedefi belirle'}
+          </Text>
+          <Text style={styles.goalText}>
+            {goal
+              ? `Günde ${goal.dailyMinutes} dk${goal.courseName ? ` · ${goal.courseName}` : goal.levelName ? ` · ${goal.levelName}` : ''}`
+              : 'Koç günlük çalışma yükünü kalan güne ve konu ustalığına göre ayarlasın.'}
+          </Text>
+        </View>
+        <Text style={styles.goalArrow}>→</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        activeOpacity={0.88}
         style={styles.planCard}
         onPress={() => router.push('/plan')}>
         <View style={styles.planTopRow}>
@@ -87,7 +113,7 @@ export default function HomeScreen() {
         </View>
         <Text style={styles.planText}>
           {plan.tasks.length > 0
-            ? `Yaklaşık ${plan.totalMinutes} dk · tekrar + zayıf konu + ilerleme dengesi`
+            ? `Yaklaşık ${plan.totalMinutes} dk · ${goal ? 'hedef + tekrar + ustalık dengesi' : 'tekrar + zayıf konu + ilerleme dengesi'}`
             : 'Bir konuya başlayınca Koç günlük çalışma rotanı otomatik hazırlayacak.'}
         </Text>
         <View style={styles.planTrack}>
@@ -183,6 +209,15 @@ const styles = StyleSheet.create({
   statCard: { flex: 1, backgroundColor: '#2A2647', borderRadius: 16, padding: 14 },
   statValue: { color: '#FFFFFF', fontSize: 18, fontWeight: '800' },
   statLabel: { color: '#BEB8D6', fontSize: 11, marginTop: 2 },
+  goalCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 15, borderWidth: 1, borderColor: '#E7E3F5', flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  goalCardActive: { backgroundColor: '#FFF5D8', borderColor: '#F4D782' },
+  goalIconWrap: { width: 48, height: 48, borderRadius: 16, backgroundColor: '#FFF9E9', alignItems: 'center', justifyContent: 'center' },
+  goalIcon: { fontSize: 23 },
+  goalBody: { flex: 1, marginLeft: 12 },
+  goalEyebrow: { color: '#A66B00', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
+  goalTitle: { color: '#1D1A34', fontSize: 15, fontWeight: '900', marginTop: 2 },
+  goalText: { color: '#735F31', fontSize: 10, lineHeight: 15, marginTop: 3 },
+  goalArrow: { color: '#A66B00', fontSize: 22, fontWeight: '900' },
   planCard: { backgroundColor: '#6552D9', borderRadius: 20, padding: 17, marginBottom: 10 },
   planTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
   planEyebrow: { color: '#DCD5FF', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
