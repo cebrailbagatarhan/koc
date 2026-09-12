@@ -52,7 +52,7 @@ export async function pickAndPersistLearningFile(): Promise<PickedLearningFile |
     throw new Error('Dosya çok büyük. En fazla 25 MB kaynak ekleyebilirsin.');
   }
 
-  const sourceFile = new File(asset);
+  const sourceFile = new File(asset.uri);
   const sourceDirectory = new Directory(Paths.document, SOURCE_DIRECTORY);
   sourceDirectory.create({ idempotent: true, intermediates: true });
 
