@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 
 import { getTopic } from '@/data/topicCatalog';
 import { getQuizQuestionsForTopic } from '@/data/topicQuiz';
+import { recordTopicVisit } from '@/storage/coachStore';
 import { recordCourseSession, searchSourcesForCourse, type LocalSource } from '@/storage/learningStore';
 
 export default function TopicScreen() {
@@ -22,6 +23,7 @@ export default function TopicScreen() {
   useEffect(() => {
     if (!levelName || !courseName || !topicName) return;
     recordCourseSession(levelName, courseName);
+    recordTopicVisit(levelName, courseName, topicName);
     searchSourcesForCourse(levelName, courseName, '', topicName).then(setSources);
   }, [courseName, levelName, topicName]);
 
