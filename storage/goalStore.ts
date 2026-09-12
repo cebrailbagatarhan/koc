@@ -66,6 +66,16 @@ async function ensureGoalSchema() {
   return goalSchemaPromise;
 }
 
+async function invalidateTodayPlan() {
+  const db = await getLearningDatabase();
+  const table = await db.getFirstAsync<{ name: string }>(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'daily_plan_tasks'`,
+  );
+  if (table) {
+    await db.runAsync('DELETE FROM daily_plan_tasks WHERE plan_date = ?', localDateKey());
+  }
+}
+
 function rowToGoal(row: GoalRow): StudyGoal {
   return {
     id: row.id,
@@ -147,7 +157,7 @@ export async function saveStudyGoal(input: {
     now,
   );
 
-  await db.runAsync('DELETE FROM daily_plan_tasks WHERE plan_date = ?', localDateKey());
+  await invalidateTodayPlan();
   return getActiveGoal();
 }
 
@@ -155,5 +165,5 @@ export async function clearStudyGoal() {
   await ensureGoalSchema();
   const db = await getLearningDatabase();
   await db.runAsync('DELETE FROM study_goals');
-  await db.runAsync('DELETE FROM daily_plan_tasks WHERE plan_date = ?', localDateKey());
+  await invalidateTodayPlan();
 }
