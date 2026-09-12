@@ -2,7 +2,8 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { getQuizQuestions, type QuizQuestion } from '@/data/offlineContent';
+import { type QuizQuestion } from '@/data/offlineContent';
+import { getQuizQuestionsForTopic } from '@/data/topicQuiz';
 import { recordQuizOutcome } from '@/storage/reviewStore';
 
 function shuffled<T>(items: T[]) {
@@ -10,10 +11,14 @@ function shuffled<T>(items: T[]) {
 }
 
 export default function QuizScreen() {
-  const { levelName, courseName } = useLocalSearchParams<{ levelName: string; courseName: string }>();
+  const { levelName, courseName, topicName } = useLocalSearchParams<{
+    levelName: string;
+    courseName: string;
+    topicName?: string;
+  }>();
   const questionSet = useMemo(
-    () => shuffled(getQuizQuestions(levelName, courseName)).slice(0, 5),
-    [levelName, courseName],
+    () => shuffled(getQuizQuestionsForTopic(levelName, courseName, topicName)).slice(0, 5),
+    [levelName, courseName, topicName],
   );
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -21,6 +26,7 @@ export default function QuizScreen() {
   const [finished, setFinished] = useState(false);
 
   const question: QuizQuestion | undefined = questionSet[index];
+  const screenLabel = topicName ? `${courseName ?? 'Ders'} · ${topicName}` : `${courseName ?? 'Ders'} · Quiz`;
 
   const handleAnswer = async (answer: string) => {
     if (!question || selected || !levelName || !courseName) return;
@@ -48,10 +54,14 @@ export default function QuizScreen() {
   if (!questionSet.length) {
     return (
       <View style={styles.centerContainer}>
-        <Stack.Screen options={{ title: `${courseName ?? 'Ders'} · Quiz` }} />
+        <Stack.Screen options={{ title: screenLabel }} />
         <Text style={styles.emptyIcon}>🧩</Text>
-        <Text style={styles.emptyTitle}>Bu ders için yerel soru bankası hazırlanıyor.</Text>
-        <Text style={styles.emptyText}>Ekran API’ye bağlı değil; soru bankasına veri eklendiğinde doğrudan çalışacak.</Text>
+        <Text style={styles.emptyTitle}>
+          {topicName ? 'Bu konu için yerel soru bankası hazırlanıyor.' : 'Bu ders için yerel soru bankası hazırlanıyor.'}
+        </Text>
+        <Text style={styles.emptyText}>
+          Eğitim akışı API’ye bağlı değil; bu konuya soru eklendiğinde doğrudan burada çalışacak.
+        </Text>
       </View>
     );
   }
@@ -60,7 +70,8 @@ export default function QuizScreen() {
     const percent = Math.round((score / questionSet.length) * 100);
     return (
       <View style={styles.centerContainer}>
-        <Stack.Screen options={{ title: `${courseName ?? 'Ders'} · Sonuç` }} />
+        <Stack.Screen options={{ title: topicName ? `${topicName} · Sonuç` : `${courseName ?? 'Ders'} · Sonuç` }} />
+        {topicName ? <Text style={styles.topicBadge}>{topicName}</Text> : null}
         <Text style={styles.resultIcon}>{percent >= 70 ? '🎉' : '💪'}</Text>
         <Text style={styles.resultTitle}>{score}/{questionSet.length} doğru</Text>
         <Text style={styles.resultPercent}>%{percent}</Text>
@@ -73,7 +84,14 @@ export default function QuizScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Stack.Screen options={{ title: `${courseName ?? 'Ders'} · Quiz` }} />
+      <Stack.Screen options={{ title: screenLabel }} />
+
+      {topicName ? (
+        <View style={styles.topicHeader}>
+          <Text style={styles.topicHeaderLabel}>KONU QUIZİ</Text>
+          <Text style={styles.topicHeaderTitle}>{topicName}</Text>
+        </View>
+      ) : null}
 
       <View style={styles.topRow}>
         <Text style={styles.counter}>Soru {index + 1}/{questionSet.length}</Text>
@@ -129,6 +147,9 @@ export default function QuizScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F3FB' },
   content: { padding: 18, paddingBottom: 36 },
+  topicHeader: { backgroundColor: '#EDE9FF', borderRadius: 15, padding: 13, marginBottom: 14 },
+  topicHeaderLabel: { color: '#6552D9', fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+  topicHeaderTitle: { color: '#1D1A34', fontSize: 15, fontWeight: '800', marginTop: 3 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between' },
   counter: { color: '#1D1A34', fontWeight: '800', fontSize: 13 },
   score: { color: '#12B3A8', fontWeight: '800', fontSize: 13 },
@@ -151,6 +172,7 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 46 },
   emptyTitle: { color: '#1D1A34', fontSize: 20, fontWeight: '800', textAlign: 'center', marginTop: 12 },
   emptyText: { color: '#6B6684', fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 7 },
+  topicBadge: { color: '#6552D9', fontSize: 11, fontWeight: '900', backgroundColor: '#EDE9FF', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, marginBottom: 10 },
   resultIcon: { fontSize: 58 },
   resultTitle: { color: '#1D1A34', fontSize: 28, fontWeight: '800', marginTop: 12 },
   resultPercent: { color: '#FF5C7C', fontSize: 20, fontWeight: '800', marginTop: 4 },

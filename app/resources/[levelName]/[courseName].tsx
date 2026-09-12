@@ -1,7 +1,8 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
+import { getTopicsForCatalogCourse } from '@/data/topicCatalog';
 import {
   deletePersistedLearningFile,
   formatFileSize,
@@ -18,20 +19,34 @@ import {
 const ALL_TOPICS = '__all__';
 
 export default function ResourcesScreen() {
-  const { levelName, courseName } = useLocalSearchParams<{ levelName: string; courseName: string }>();
+  const { levelName, courseName, topicName: routeTopicName } = useLocalSearchParams<{
+    levelName: string;
+    courseName: string;
+    topicName?: string;
+  }>();
+  const catalogTopics = useMemo(
+    () => getTopicsForCatalogCourse(levelName, courseName),
+    [courseName, levelName],
+  );
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [topicName, setTopicName] = useState('');
+  const [topicName, setTopicName] = useState(routeTopicName ?? '');
   const [query, setQuery] = useState('');
-  const [selectedTopic, setSelectedTopic] = useState(ALL_TOPICS);
-  const [topics, setTopics] = useState<string[]>([]);
+  const [selectedTopic, setSelectedTopic] = useState(routeTopicName ?? ALL_TOPICS);
+  const [topics, setTopics] = useState<string[]>(catalogTopics.map((topic) => topic.name));
   const [sources, setSources] = useState<LocalSource[]>([]);
   const [saving, setSaving] = useState(false);
   const [importingFile, setImportingFile] = useState(false);
 
+  useEffect(() => {
+    if (!routeTopicName) return;
+    setTopicName(routeTopicName);
+    setSelectedTopic(routeTopicName);
+  }, [routeTopicName]);
+
   const reload = useCallback(async () => {
     if (!levelName || !courseName) return;
-    const [nextSources, nextTopics] = await Promise.all([
+    const [nextSources, storedTopics] = await Promise.all([
       searchSourcesForCourse(
         levelName,
         courseName,
@@ -40,9 +55,12 @@ export default function ResourcesScreen() {
       ),
       getTopicsForCourse(levelName, courseName),
     ]);
+    const mergedTopics = Array.from(
+      new Set([...catalogTopics.map((topic) => topic.name), ...storedTopics]),
+    );
     setSources(nextSources);
-    setTopics(nextTopics);
-  }, [courseName, levelName, query, selectedTopic]);
+    setTopics(mergedTopics);
+  }, [catalogTopics, courseName, levelName, query, selectedTopic]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -54,6 +72,11 @@ export default function ResourcesScreen() {
   const clearForm = () => {
     setTitle('');
     setBody('');
+  };
+
+  const selectTopicForNewSource = (nextTopic: string) => {
+    setTopicName(nextTopic);
+    setSelectedTopic(nextTopic);
   };
 
   const handleAddNote = async () => {
@@ -156,20 +179,35 @@ export default function ResourcesScreen() {
       <Stack.Screen options={{ title: `${courseName ?? 'Ders'} · Kaynaklar` }} />
 
       <View style={styles.infoCard}>
-        <Text style={styles.infoTitle}>🗂️ Yerel kaynak kütüphanesi v2</Text>
+        <Text style={styles.infoTitle}>🗂️ Konuya bağlı yerel kaynaklar</Text>
         <Text style={styles.infoText}>
-          Kaynaklar SQLite içinde ders ve konuya bağlanır. Metin tabanlı dosyalar parçalara ayrılıp cihazda aranır;
-          PDF ve diğer dosyalar cihazın kalıcı alanında saklanır.
+          Not, PDF ve dosyalarını dersin belirli bir konusuna bağlayabilirsin. Metin tabanlı dosyalar cihazda aranır; PDF ve diğer dosyalar kalıcı uygulama alanında tutulur.
         </Text>
       </View>
 
       <View style={styles.formCard}>
         <Text style={styles.formTitle}>Kaynak ekle</Text>
+        {catalogTopics.length > 0 ? (
+          <>
+            <Text style={styles.fieldLabel}>Katalogdan konu seç</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catalogTopicRow}>
+              {catalogTopics.map((topic) => (
+                <TouchableOpacity
+                  key={topic.name}
+                  style={[styles.catalogTopicChip, topicName === topic.name && styles.catalogTopicChipActive]}
+                  onPress={() => selectTopicForNewSource(topic.name)}>
+                  <Text style={styles.catalogTopicIcon}>{topic.icon}</Text>
+                  <Text style={[styles.catalogTopicText, topicName === topic.name && styles.catalogTopicTextActive]}>{topic.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </>
+        ) : null}
         <TextInput
           style={styles.titleInput}
           value={topicName}
           onChangeText={setTopicName}
-          placeholder="Konu (örn. Üslü sayılar) · isteğe bağlı"
+          placeholder="Konu adı · istersen özel konu yaz"
           placeholderTextColor="#9A95AD"
         />
         <TextInput
@@ -242,7 +280,7 @@ export default function ResourcesScreen() {
         <View style={styles.emptyCard}>
           <Text style={styles.emptyText}>
             {query.trim() || selectedTopic !== ALL_TOPICS
-              ? 'Bu arama için kaynak bulunamadı.'
+              ? 'Bu arama veya konu için kaynak bulunamadı.'
               : 'Henüz kaynak yok. İlk notunu veya dosyanı yukarıdan ekleyebilirsin.'}
           </Text>
         </View>
@@ -287,6 +325,13 @@ const styles = StyleSheet.create({
   infoText: { color: '#397A76', fontSize: 12, lineHeight: 18, marginTop: 5 },
   formCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 17, borderWidth: 1, borderColor: '#E7E3F5' },
   formTitle: { color: '#1D1A34', fontSize: 17, fontWeight: '800', marginBottom: 12 },
+  fieldLabel: { color: '#6B6684', fontSize: 10, fontWeight: '800', marginBottom: 7 },
+  catalogTopicRow: { gap: 7, paddingRight: 10, paddingBottom: 11 },
+  catalogTopicChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999, backgroundColor: '#F5F3FB', borderWidth: 1, borderColor: '#E7E3F5' },
+  catalogTopicChipActive: { backgroundColor: '#EDE9FF', borderColor: '#6552D9' },
+  catalogTopicIcon: { fontSize: 12 },
+  catalogTopicText: { color: '#6B6684', fontSize: 10, fontWeight: '700' },
+  catalogTopicTextActive: { color: '#4A38B7' },
   titleInput: { backgroundColor: '#F5F3FB', borderRadius: 12, paddingHorizontal: 13, height: 46, borderWidth: 1, borderColor: '#E7E3F5', color: '#1D1A34' },
   inputSpacing: { marginTop: 10 },
   bodyInput: { backgroundColor: '#F5F3FB', borderRadius: 12, padding: 13, minHeight: 115, borderWidth: 1, borderColor: '#E7E3F5', color: '#1D1A34', marginTop: 10 },
