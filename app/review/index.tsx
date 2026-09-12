@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { useFocusEffect } from '@react-navigation/native';
 
 import { getQuizQuestions, type QuizQuestion } from '@/data/offlineContent';
+import { completeDailyPlanReview } from '@/storage/coachStore';
 import {
   getDueReviewItems,
   getReviewDashboard,
@@ -88,8 +89,9 @@ export default function ReviewScreen() {
     });
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (index >= queue.length - 1) {
+      await completeDailyPlanReview();
       setFinished(true);
       getReviewDashboard().then(setDashboard);
       return;
