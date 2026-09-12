@@ -1,71 +1,82 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-const levels = [
-  { name: 'İlkokul', color: '#FFDDC1' },
-  { name: 'Ortaokul', color: '#C2EABD' },
-  { name: 'Lise', color: '#AED9E0' },
-  { name: 'ALES', color: '#FFB7B2' },
-];
+import { LEVELS } from '@/data/courseCatalog';
+import { getActivityStats, type ActivityStats } from '@/storage/learningStore';
+
+const initialStats: ActivityStats = { streakDays: 0, lastStudyDate: null, totalStudyActions: 0 };
 
 export default function HomeScreen() {
-  const handlePress = (levelName: string) => {
-    router.push(`/level/${levelName}`);
-  };
+  const [stats, setStats] = useState<ActivityStats>(initialStats);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      getActivityStats().then((value) => active && setStats(value));
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Eğitim Seviyenizi Seçin</Text>
-      <View style={styles.cardContainer}>
-        {levels.map((level) => (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.hero}>
+        <Text style={styles.eyebrow}>KOÇ · ÇEVRİMDIŞI ÖĞRENME</Text>
+        <Text style={styles.title}>Bugün ne çalışıyoruz?</Text>
+        <Text style={styles.subtitle}>
+          Dersler, testler, kaynaklar ve ilerleme cihazında çalışır. AI entegrasyonu daha sonra eklenebilir.
+        </Text>
+
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>🔥 {stats.streakDays}</Text>
+            <Text style={styles.statLabel}>gün seri</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>✓ {stats.totalStudyActions}</Text>
+            <Text style={styles.statLabel}>çalışma adımı</Text>
+          </View>
+        </View>
+      </View>
+
+      <Text style={styles.sectionTitle}>Eğitim seviyeni seç</Text>
+      <View style={styles.levelGrid}>
+        {LEVELS.map((level) => (
           <TouchableOpacity
             key={level.name}
-            style={[styles.card, { backgroundColor: level.color }]}
-            onPress={() => handlePress(level.name)}
-          >
-            <Text style={styles.cardText}>{level.name}</Text>
+            style={styles.levelCard}
+            activeOpacity={0.86}
+            onPress={() => router.push(`/level/${level.name}`)}>
+            <Text style={styles.levelIcon}>{level.icon}</Text>
+            <Text style={styles.levelName}>{level.name}</Text>
+            <Text style={styles.levelDescription}>{level.description}</Text>
+            <Text style={styles.courseCount}>{level.courses.length} ders →</Text>
           </TouchableOpacity>
         ))}
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#F5F5F5',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 40,
-    color: '#333',
-  },
-  cardContainer: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  card: {
-    width: '90%',
-    paddingVertical: 25,
-    paddingHorizontal: 20,
-    borderRadius: 15,
-    marginBottom: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  cardText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-  },
+  container: { flex: 1, backgroundColor: '#F5F3FB' },
+  content: { padding: 18, paddingBottom: 36 },
+  hero: { backgroundColor: '#1D1A34', borderRadius: 24, padding: 22, marginBottom: 24 },
+  eyebrow: { color: '#FFC145', fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
+  title: { color: '#FFFFFF', fontSize: 30, lineHeight: 36, fontWeight: '800', marginTop: 8 },
+  subtitle: { color: '#D9D5E8', fontSize: 14, lineHeight: 21, marginTop: 10 },
+  statsRow: { flexDirection: 'row', gap: 10, marginTop: 18 },
+  statCard: { flex: 1, backgroundColor: '#2A2647', borderRadius: 16, padding: 14 },
+  statValue: { color: '#FFFFFF', fontSize: 18, fontWeight: '800' },
+  statLabel: { color: '#BEB8D6', fontSize: 11, marginTop: 2 },
+  sectionTitle: { color: '#1D1A34', fontSize: 18, fontWeight: '800', marginBottom: 12 },
+  levelGrid: { gap: 12 },
+  levelCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: '#E7E3F5' },
+  levelIcon: { fontSize: 30 },
+  levelName: { color: '#1D1A34', fontSize: 20, fontWeight: '800', marginTop: 8 },
+  levelDescription: { color: '#6B6684', fontSize: 13, lineHeight: 19, marginTop: 4 },
+  courseCount: { color: '#FF5C7C', fontSize: 12, fontWeight: '700', marginTop: 12 },
 });
