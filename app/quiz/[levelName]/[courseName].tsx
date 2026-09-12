@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 
 import { type QuizQuestion } from '@/data/offlineContent';
 import { getQuizQuestionsForTopic } from '@/data/topicQuiz';
+import { completeDailyPlanTopic } from '@/storage/coachStore';
 import { recordQuizOutcome } from '@/storage/reviewStore';
 
 function shuffled<T>(items: T[]) {
@@ -42,8 +43,11 @@ export default function QuizScreen() {
     });
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (index >= questionSet.length - 1) {
+      if (topicName && levelName && courseName) {
+        await completeDailyPlanTopic(levelName, courseName, topicName);
+      }
       setFinished(true);
       return;
     }
