@@ -1,87 +1,109 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, type ViewStyle } from 'react-native';
+
+import { getCourse } from '@/data/courseCatalog';
 
 export default function CourseScreen() {
   const { levelName, courseName } = useLocalSearchParams<{ levelName: string; courseName: string }>();
-
-  const handlePress = (type: 'Konu Anlatımı' | 'Soru Çözümü') => {
-    if (type === 'Soru Çözümü') {
-      router.push(`/quiz/${levelName}/${courseName}`);
-    } else {
-      router.push(`/chat/${levelName}/${courseName}`);
-    }
-  };
+  const course = getCourse(levelName, courseName);
+  const isEnglish = courseName === 'İngilizce';
 
   return (
-    <View style={styles.container}>
-      <Stack.Screen options={{ title: `${courseName}` }} />
-      <Text style={styles.header}>{courseName}</Text>
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={[styles.button, styles.explanationButton]}
-          onPress={() => handlePress('Konu Anlatımı')}
-        >
-          <Text style={styles.buttonIcon}>📘</Text>
-          <Text style={styles.buttonText}>Konu Anlatımları</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.quizButton]}
-          onPress={() => handlePress('Soru Çözümü')}
-        >
-          <Text style={styles.buttonIcon}>❓</Text>
-          <Text style={styles.buttonText}>Soru Çözümleri</Text>
-        </TouchableOpacity>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <Stack.Screen options={{ title: courseName ?? 'Ders' }} />
+
+      <View style={styles.hero}>
+        <Text style={styles.icon}>{course?.icon ?? '📘'}</Text>
+        <Text style={styles.title}>{courseName}</Text>
+        <Text style={styles.level}>{levelName}</Text>
+        <Text style={styles.description}>{course?.description}</Text>
       </View>
-    </View>
+
+      <Text style={styles.sectionTitle}>Çalışma modu</Text>
+      <ActionCard
+        icon="📘"
+        title="Konu Anlatımı"
+        description="Yerel konu özeti ve kendi eklediğin kaynaklarla çalış."
+        tone="green"
+        onPress={() => router.push(`/lesson/${levelName}/${courseName}`)}
+      />
+      <ActionCard
+        icon="❓"
+        title="Soru Çözümü"
+        description="API gerektirmeyen yerel soru bankasından quiz çöz."
+        tone="blue"
+        onPress={() => router.push(`/quiz/${levelName}/${courseName}`)}
+      />
+      <ActionCard
+        icon="🗂️"
+        title="Kaynaklarım"
+        description="Bu ders için kendi notunu veya çalışma kaynağını cihazda sakla."
+        tone="yellow"
+        onPress={() => router.push(`/resources/${levelName}/${courseName}`)}
+      />
+      {isEnglish ? (
+        <ActionCard
+          icon="💬"
+          title="Konuşma Labı"
+          description="TalkLab’den gelen çevrimdışı senaryolarla İngilizce pratik yap."
+          tone="pink"
+          onPress={() => router.push(`/chat/${levelName}/${courseName}`)}
+        />
+      ) : null}
+
+      <View style={styles.apiNote}>
+        <Text style={styles.apiTitle}>AI katmanı kapalı</Text>
+        <Text style={styles.apiText}>Ders ve quiz akışları API anahtarı olmadan çalışır. AI daha sonra isteğe bağlı sağlayıcı olarak eklenebilir.</Text>
+      </View>
+    </ScrollView>
+  );
+}
+
+type ActionCardProps = {
+  icon: string;
+  title: string;
+  description: string;
+  tone: 'green' | 'blue' | 'yellow' | 'pink';
+  onPress: () => void;
+};
+
+const toneStyles: Record<ActionCardProps['tone'], ViewStyle> = {
+  green: { backgroundColor: '#E8F8F3', borderColor: '#C4EDE1' },
+  blue: { backgroundColor: '#EAF2FF', borderColor: '#CCDDF7' },
+  yellow: { backgroundColor: '#FFF6DD', borderColor: '#F1E0AD' },
+  pink: { backgroundColor: '#FFE9EF', borderColor: '#F9CBD7' },
+};
+
+function ActionCard({ icon, title, description, tone, onPress }: ActionCardProps) {
+  return (
+    <TouchableOpacity style={[styles.actionCard, toneStyles[tone]]} activeOpacity={0.86} onPress={onPress}>
+      <Text style={styles.actionIcon}>{icon}</Text>
+      <View style={styles.actionBody}>
+        <Text style={styles.actionTitle}>{title}</Text>
+        <Text style={styles.actionText}>{description}</Text>
+      </View>
+      <Text style={styles.arrow}>›</Text>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#F5F5F5',
-    alignItems: 'center',
-  },
-  header: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 40,
-    textAlign: 'center',
-  },
-  buttonContainer: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '90%',
-    paddingVertical: 20,
-    borderRadius: 15,
-    marginBottom: 20,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-  },
-  explanationButton: {
-    backgroundColor: '#4CAF50', // Yeşil
-  },
-  quizButton: {
-    backgroundColor: '#2196F3', // Mavi
-  },
-  buttonIcon: {
-    fontSize: 24,
-    marginRight: 10,
-  },
-  buttonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
+  container: { flex: 1, backgroundColor: '#F5F3FB' },
+  content: { padding: 18, paddingBottom: 36 },
+  hero: { backgroundColor: '#1D1A34', borderRadius: 24, padding: 22, marginBottom: 22 },
+  icon: { fontSize: 36 },
+  title: { color: '#FFFFFF', fontSize: 28, fontWeight: '800', marginTop: 8 },
+  level: { color: '#FFC145', fontSize: 12, fontWeight: '700', marginTop: 2 },
+  description: { color: '#D9D5E8', fontSize: 13, lineHeight: 19, marginTop: 8 },
+  sectionTitle: { color: '#1D1A34', fontSize: 18, fontWeight: '800', marginBottom: 10 },
+  actionCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 18, padding: 15, marginBottom: 10, borderWidth: 1 },
+  actionIcon: { fontSize: 26, width: 42 },
+  actionBody: { flex: 1 },
+  actionTitle: { color: '#1D1A34', fontSize: 16, fontWeight: '800' },
+  actionText: { color: '#6B6684', fontSize: 12, lineHeight: 17, marginTop: 3 },
+  arrow: { color: '#6B6684', fontSize: 28, marginLeft: 8 },
+  apiNote: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#E7E3F5', marginTop: 10 },
+  apiTitle: { color: '#12B3A8', fontWeight: '800', fontSize: 12 },
+  apiText: { color: '#6B6684', fontSize: 11, lineHeight: 16, marginTop: 4 },
 });
