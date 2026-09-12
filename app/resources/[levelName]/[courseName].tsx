@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -55,17 +55,12 @@ export default function ResourcesScreen() {
       ),
       getTopicsForCourse(levelName, courseName),
     ]);
-    const mergedTopics = Array.from(
-      new Set([...catalogTopics.map((topic) => topic.name), ...storedTopics]),
-    );
     setSources(nextSources);
-    setTopics(mergedTopics);
+    setTopics(Array.from(new Set([...catalogTopics.map((topic) => topic.name), ...storedTopics])));
   }, [catalogTopics, courseName, levelName, query, selectedTopic]);
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      reload();
-    }, 180);
+    const timeout = setTimeout(reload, 180);
     return () => clearTimeout(timeout);
   }, [reload]);
 
@@ -77,6 +72,18 @@ export default function ResourcesScreen() {
   const selectTopicForNewSource = (nextTopic: string) => {
     setTopicName(nextTopic);
     setSelectedTopic(nextTopic);
+  };
+
+  const openStudio = () => {
+    if (!levelName || !courseName) return;
+    router.push({
+      pathname: '/studio/[levelName]/[courseName]',
+      params: {
+        levelName,
+        courseName,
+        ...(selectedTopic !== ALL_TOPICS ? { topicName: selectedTopic } : {}),
+      },
+    });
   };
 
   const handleAddNote = async () => {
@@ -131,20 +138,30 @@ export default function ResourcesScreen() {
       clearForm();
       await reload();
 
-      if (picked.textExtractionStatus === 'not-supported') {
+      if (picked.textExtractionStatus === 'extracted') {
+        Alert.alert(
+          'Kaynak hazır',
+          `Dosya cihazda saklandı ve ${picked.extractedText.length.toLocaleString('tr-TR')} karakter metin çıkarılıp indekslendi. Artık Kaynak Stüdyosu bu içerikten özet, kart ve quiz hazırlayabilir.`,
+        );
+      } else if (picked.textExtractionStatus === 'image-only') {
+        Alert.alert(
+          'PDF saklandı, metin katmanı yok',
+          'Bu PDF büyük olasılıkla taranmış görüntülerden oluşuyor. Dosya saklandı ancak içerikten çalışma üretmek için OCR gerekir.',
+        );
+      } else if (picked.textExtractionStatus === 'not-supported') {
         Alert.alert(
           'Dosya eklendi',
-          'Dosya cihazda saklandı. Bu dosya türünün metni henüz çıkarılmadığı için arama başlık, konu ve eklediğin not üzerinden çalışacak.',
+          'Dosya cihazda saklandı. Bu dosya türünde metin çıkarımı yok; arama başlık, konu ve eklediğin not üzerinden çalışacak.',
         );
       } else if (picked.textExtractionStatus === 'too-large') {
         Alert.alert(
           'Dosya eklendi',
-          'Dosya saklandı ancak büyük olduğu için içeriği indekslenmedi. Başlık, konu ve not alanı aranabilir.',
+          'Dosya saklandı ancak güvenli bellek sınırını aşmamak için metni indekslenmedi.',
         );
       } else if (picked.textExtractionStatus === 'failed') {
         Alert.alert(
-          'Dosya eklendi',
-          'Dosya saklandı fakat metin içeriği okunamadı. Başlık, konu ve not alanı aranabilir.',
+          'Dosya saklandı',
+          'Metin çıkarımı başarısız oldu. Dosya kaybolmadı; başlık, konu ve not alanı kullanılabilir.',
         );
       }
       persistedFileUri = null;
@@ -181,9 +198,18 @@ export default function ResourcesScreen() {
       <View style={styles.infoCard}>
         <Text style={styles.infoTitle}>🗂️ Konuya bağlı yerel kaynaklar</Text>
         <Text style={styles.infoText}>
-          Not, PDF ve dosyalarını dersin belirli bir konusuna bağlayabilirsin. Metin tabanlı dosyalar cihazda aranır; PDF ve diğer dosyalar kalıcı uygulama alanında tutulur.
+          Not ve metin dosyaları doğrudan indekslenir. Metin katmanı olan PDF’lerin içeriği de Android ve iOS’ta cihaz üzerinde çıkarılır; taranmış PDF için OCR gerekir.
         </Text>
       </View>
+
+      <TouchableOpacity style={styles.studioCard} activeOpacity={0.88} onPress={openStudio}>
+        <View style={styles.studioBody}>
+          <Text style={styles.studioEyebrow}>KAYNAK STÜDYOSU</Text>
+          <Text style={styles.studioTitle}>Özet · kart · kaynak quizi</Text>
+          <Text style={styles.studioText}>Eklediğin okunabilir içerikten kaynak gösteren çalışma materyali üret.</Text>
+        </View>
+        <Text style={styles.studioArrow}>→</Text>
+      </TouchableOpacity>
 
       <View style={styles.formCard}>
         <Text style={styles.formTitle}>Kaynak ekle</Text>
@@ -238,7 +264,7 @@ export default function ResourcesScreen() {
             style={[styles.fileButton, importingFile && styles.disabled]}
             disabled={importingFile}
             onPress={handleAddFile}>
-            <Text style={styles.fileButtonText}>{importingFile ? 'Ekleniyor...' : '📎 PDF / dosya ekle'}</Text>
+            <Text style={styles.fileButtonText}>{importingFile ? 'Okunuyor...' : '📎 PDF / dosya ekle'}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -320,9 +346,15 @@ export default function ResourcesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F3FB' },
   content: { padding: 18, paddingBottom: 36 },
-  infoCard: { backgroundColor: '#DFF6F4', borderRadius: 18, padding: 16, marginBottom: 14 },
+  infoCard: { backgroundColor: '#DFF6F4', borderRadius: 18, padding: 16, marginBottom: 10 },
   infoTitle: { color: '#0E716B', fontWeight: '800', fontSize: 14 },
   infoText: { color: '#397A76', fontSize: 12, lineHeight: 18, marginTop: 5 },
+  studioCard: { backgroundColor: '#1D1A34', borderRadius: 18, padding: 15, marginBottom: 14, flexDirection: 'row', alignItems: 'center' },
+  studioBody: { flex: 1 },
+  studioEyebrow: { color: '#FFC145', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
+  studioTitle: { color: '#FFFFFF', fontSize: 15, fontWeight: '900', marginTop: 3 },
+  studioText: { color: '#D9D5E8', fontSize: 10, lineHeight: 15, marginTop: 3 },
+  studioArrow: { color: '#FFC145', fontSize: 23, fontWeight: '900', marginLeft: 8 },
   formCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 17, borderWidth: 1, borderColor: '#E7E3F5' },
   formTitle: { color: '#1D1A34', fontSize: 17, fontWeight: '800', marginBottom: 12 },
   fieldLabel: { color: '#6B6684', fontSize: 10, fontWeight: '800', marginBottom: 7 },

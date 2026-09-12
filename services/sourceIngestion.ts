@@ -1,9 +1,23 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { Directory, File, Paths } from 'expo-file-system';
 
+import {
+  extractPdfText,
+  isPdfTextExtractionAvailable,
+} from '@/modules/koc-pdf-text-extract/src';
+
 const SOURCE_DIRECTORY = 'learning-sources';
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
+const MAX_TEXT_FILE_EXTRACT_SIZE = 2 * 1024 * 1024;
+const MAX_PDF_EXTRACT_SIZE = 20 * 1024 * 1024;
 const MAX_EXTRACTED_TEXT_CHARS = 250_000;
+
+export type TextExtractionStatus =
+  | 'extracted'
+  | 'not-supported'
+  | 'too-large'
+  | 'image-only'
+  | 'failed';
 
 export type PickedLearningFile = {
   fileUri: string;
@@ -11,7 +25,7 @@ export type PickedLearningFile = {
   mimeType: string | null;
   fileSize: number | null;
   extractedText: string;
-  textExtractionStatus: 'extracted' | 'not-supported' | 'too-large' | 'failed';
+  textExtractionStatus: TextExtractionStatus;
 };
 
 function sanitizeFileName(name: string) {
@@ -28,6 +42,10 @@ function extensionOf(name: string) {
   return index >= 0 ? name.slice(index).toLowerCase() : '';
 }
 
+function isPdf(fileName: string, mimeType?: string | null) {
+  return mimeType === 'application/pdf' || extensionOf(fileName) === '.pdf';
+}
+
 function canExtractAsText(fileName: string, mimeType?: string | null) {
   const extension = extensionOf(fileName);
   return Boolean(
@@ -36,6 +54,56 @@ function canExtractAsText(fileName: string, mimeType?: string | null) {
       mimeType === 'application/xml' ||
       ['.txt', '.md', '.markdown', '.csv', '.json', '.xml', '.html', '.htm', '.js', '.ts'].includes(extension),
   );
+}
+
+function cleanExtractedText(text: string) {
+  return text
+    .replace(/\u0000/g, ' ')
+    .replace(/[\t ]+\n/g, '\n')
+    .replace(/\n{4,}/g, '\n\n\n')
+    .slice(0, MAX_EXTRACTED_TEXT_CHARS)
+    .trim();
+}
+
+async function extractSearchableText(input: {
+  file: File;
+  fileName: string;
+  mimeType?: string | null;
+  fileSize?: number | null;
+}): Promise<{ text: string; status: TextExtractionStatus }> {
+  if (isPdf(input.fileName, input.mimeType)) {
+    if (input.fileSize && input.fileSize > MAX_PDF_EXTRACT_SIZE) {
+      return { text: '', status: 'too-large' };
+    }
+    if (!isPdfTextExtractionAvailable()) {
+      return { text: '', status: 'failed' };
+    }
+    try {
+      const text = cleanExtractedText(await extractPdfText(input.file.uri));
+      return text
+        ? { text, status: 'extracted' }
+        : { text: '', status: 'image-only' };
+    } catch (error) {
+      console.warn('PDF metni çıkarılamadı.', error);
+      return { text: '', status: 'failed' };
+    }
+  }
+
+  if (!canExtractAsText(input.fileName, input.mimeType)) {
+    return { text: '', status: 'not-supported' };
+  }
+  if (input.fileSize && input.fileSize > MAX_TEXT_FILE_EXTRACT_SIZE) {
+    return { text: '', status: 'too-large' };
+  }
+
+  try {
+    const text = cleanExtractedText(await input.file.text());
+    return text
+      ? { text, status: 'extracted' }
+      : { text: '', status: 'failed' };
+  } catch {
+    return { text: '', status: 'failed' };
+  }
 }
 
 export async function pickAndPersistLearningFile(): Promise<PickedLearningFile | null> {
@@ -60,30 +128,21 @@ export async function pickAndPersistLearningFile(): Promise<PickedLearningFile |
   const persistedFile = new File(sourceDirectory, persistedName);
   sourceFile.copy(persistedFile);
 
-  let extractedText = '';
-  let textExtractionStatus: PickedLearningFile['textExtractionStatus'] = 'not-supported';
-
-  if (canExtractAsText(asset.name, asset.mimeType)) {
-    if (asset.size && asset.size > 2 * 1024 * 1024) {
-      textExtractionStatus = 'too-large';
-    } else {
-      try {
-        const rawText = await persistedFile.text();
-        extractedText = rawText.slice(0, MAX_EXTRACTED_TEXT_CHARS).trim();
-        textExtractionStatus = extractedText ? 'extracted' : 'failed';
-      } catch {
-        textExtractionStatus = 'failed';
-      }
-    }
-  }
+  const fileSize = asset.size ?? persistedFile.size ?? null;
+  const extraction = await extractSearchableText({
+    file: persistedFile,
+    fileName: asset.name,
+    mimeType: asset.mimeType,
+    fileSize,
+  });
 
   return {
     fileUri: persistedFile.uri,
     fileName: asset.name,
     mimeType: asset.mimeType ?? null,
-    fileSize: asset.size ?? persistedFile.size ?? null,
-    extractedText,
-    textExtractionStatus,
+    fileSize,
+    extractedText: extraction.text,
+    textExtractionStatus: extraction.status,
   };
 }
 

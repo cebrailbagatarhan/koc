@@ -14,6 +14,7 @@ const MAPPING = {
   'chart.bar.fill': 'bar-chart',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
+  globe: 'language',
 } as IconMapping;
 
 export function IconSymbol({
