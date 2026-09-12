@@ -149,7 +149,10 @@ export default function QuizScreen() {
       <View style={styles.questionCard}>
         <Text style={styles.bankBadge}>✓ YEREL SORU BANKASI · {question.questionKind.toLocaleUpperCase('tr-TR')}</Text>
         <Text style={styles.questionText}>{question.question}</Text>
-        <QuestionVisual visual={question.visual} />
+        <QuestionVisual
+          visual={question.visual}
+          hiddenAnswer={selected ? undefined : question.correctAnswer}
+        />
       </View>
 
       <View style={styles.options}>
