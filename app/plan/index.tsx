@@ -3,7 +3,9 @@ import { Stack, router } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { getDailyPlan, type DailyPlan } from '@/storage/coachStore';
+import { type DailyPlan } from '@/storage/coachStore';
+import { getActiveGoal, getDaysRemaining, getGoalPaceLabel, type StudyGoal } from '@/storage/goalStore';
+import { getGoalAwareDailyPlan } from '@/storage/goalPlanner';
 
 const emptyPlan: DailyPlan = { date: '', tasks: [], completedCount: 0, totalMinutes: 0 };
 
@@ -15,15 +17,17 @@ const kindMeta = {
 
 export default function DailyPlanScreen() {
   const [plan, setPlan] = useState<DailyPlan>(emptyPlan);
+  const [goal, setGoal] = useState<StudyGoal | null>(null);
   const [loading, setLoading] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
       setLoading(true);
-      getDailyPlan().then((nextPlan) => {
+      Promise.all([getGoalAwareDailyPlan(), getActiveGoal()]).then(([nextPlan, nextGoal]) => {
         if (!active) return;
         setPlan(nextPlan);
+        setGoal(nextGoal);
         setLoading(false);
       });
       return () => {
@@ -35,16 +39,19 @@ export default function DailyPlanScreen() {
   const percent = plan.tasks.length
     ? Math.round((plan.completedCount / plan.tasks.length) * 100)
     : 0;
+  const daysRemaining = goal ? getDaysRemaining(goal.targetDate) : null;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Stack.Screen options={{ title: 'Bugünün Planı' }} />
 
       <View style={styles.hero}>
-        <Text style={styles.eyebrow}>KİŞİSEL ÇALIŞMA ROTASI</Text>
+        <Text style={styles.eyebrow}>{goal ? 'HEDEF ODAKLI ÇALIŞMA ROTASI' : 'KİŞİSEL ÇALIŞMA ROTASI'}</Text>
         <Text style={styles.title}>Bugünün Planı</Text>
         <Text style={styles.subtitle}>
-          Plan seri sayacından ayrıdır. Önce tekrar, sonra zayıf konu, ardından yeni ilerleme dengesiyle hazırlanır.
+          {goal
+            ? `${goal.title} hedefi için ${daysRemaining} gün kaldı. Koç hedef kapsamını, ustalığı ve tekrar borcunu birlikte dengeliyor.`
+            : 'Plan seri sayacından ayrıdır. Önce tekrar, sonra zayıf konu, ardından yeni ilerleme dengesiyle hazırlanır.'}
         </Text>
         <View style={styles.progressRow}>
           <Text style={styles.progressValue}>{plan.completedCount}/{plan.tasks.length}</Text>
@@ -54,6 +61,22 @@ export default function DailyPlanScreen() {
           <View style={[styles.fill, { width: `${percent}%` }]} />
         </View>
       </View>
+
+      <TouchableOpacity style={styles.goalCard} onPress={() => router.push('/goals')}>
+        <View style={styles.goalIconWrap}>
+          <Text style={styles.goalIcon}>{goal ? '🏁' : '🎯'}</Text>
+        </View>
+        <View style={styles.goalBody}>
+          <Text style={styles.goalEyebrow}>{goal ? getGoalPaceLabel(goal.targetDate).toUpperCase() : 'ÇALIŞMA HEDEFİ'}</Text>
+          <Text style={styles.goalTitle}>{goal ? goal.title : 'Sınav veya tarih hedefi ekle'}</Text>
+          <Text style={styles.goalText}>
+            {goal
+              ? `${goal.targetDate} · günde ${goal.dailyMinutes} dk${goal.courseName ? ` · ${goal.courseName}` : goal.levelName ? ` · ${goal.levelName}` : ''}`
+              : 'Koç, kalan güne göre günlük planın yükünü ve konu odağını ayarlasın.'}
+          </Text>
+        </View>
+        <Text style={styles.goalArrow}>›</Text>
+      </TouchableOpacity>
 
       {loading ? (
         <View style={styles.emptyCard}>
@@ -119,6 +142,14 @@ const styles = StyleSheet.create({
   progressLabel: { color: '#BEB8D6', fontSize: 11 },
   track: { height: 7, borderRadius: 999, backgroundColor: '#393454', overflow: 'hidden', marginTop: 9 },
   fill: { height: '100%', backgroundColor: '#12B3A8' },
+  goalCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF5D8', borderRadius: 18, padding: 14, borderWidth: 1, borderColor: '#F4D782', marginBottom: 13 },
+  goalIconWrap: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  goalIcon: { fontSize: 21 },
+  goalBody: { flex: 1, marginLeft: 11 },
+  goalEyebrow: { color: '#9A6500', fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+  goalTitle: { color: '#1D1A34', fontSize: 14, fontWeight: '900', marginTop: 2 },
+  goalText: { color: '#735F31', fontSize: 10, lineHeight: 15, marginTop: 3 },
+  goalArrow: { color: '#9A6500', fontSize: 24, fontWeight: '900' },
   taskList: { gap: 10 },
   taskCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 19, padding: 15, borderWidth: 1, borderColor: '#E7E3F5' },
   taskCardDone: { backgroundColor: '#F1FBF8', borderColor: '#BFE8DE' },
