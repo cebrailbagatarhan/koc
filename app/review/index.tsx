@@ -3,8 +3,9 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
-import { getQuizQuestions, type QuizQuestion } from '@/data/offlineContent';
+import { type QuizQuestion } from '@/data/offlineContent';
 import { completeDailyPlanReview } from '@/storage/coachStore';
+import { getQuestionFromDatabase } from '@/storage/questionBankStore';
 import {
   getDueReviewItems,
   getReviewDashboard,
@@ -25,12 +26,6 @@ const emptyDashboard: ReviewDashboard = {
   weakCourses: [],
 };
 
-function resolveQuestion(item: ReviewItem) {
-  return getQuizQuestions(item.levelName, item.courseName).find(
-    (question) => question.id === item.questionId,
-  );
-}
-
 export default function ReviewScreen() {
   const [queue, setQueue] = useState<QueueEntry[]>([]);
   const [dashboard, setDashboard] = useState<ReviewDashboard>(emptyDashboard);
@@ -46,14 +41,15 @@ export default function ReviewScreen() {
       getDueReviewItems(),
       getReviewDashboard(),
     ]);
-    const resolved = items
-      .map((review) => {
-        const question = resolveQuestion(review);
-        return question ? { review, question } : null;
-      })
-      .filter((entry): entry is QueueEntry => Boolean(entry));
 
-    setQueue(resolved);
+    const resolved = await Promise.all(
+      items.map(async (review) => {
+        const question = await getQuestionFromDatabase(review.questionId);
+        return question ? { review, question } : null;
+      }),
+    );
+
+    setQueue(resolved.filter((entry): entry is QueueEntry => Boolean(entry)));
     setDashboard(nextDashboard);
     setIndex(0);
     setSelected(null);
@@ -138,7 +134,7 @@ export default function ReviewScreen() {
           <Text style={styles.bigIcon}>🌿</Text>
           <Text style={styles.finishTitle}>Şu anda bekleyen tekrar yok</Text>
           <Text style={styles.muted}>
-            Yanlış yaptığın sorular otomatik olarak buraya gelir. Doğru tekrar ettikçe aralıkları uzar.
+            Yanlış yaptığın doğrulanmış sorular otomatik olarak buraya gelir. Doğru tekrar ettikçe aralıkları uzar.
           </Text>
         </View>
 
@@ -179,6 +175,7 @@ export default function ReviewScreen() {
       </View>
 
       <View style={styles.questionCard}>
+        <Text style={styles.bankBadge}>✓ YEREL SORU BANKASI</Text>
         <Text style={styles.questionText}>{current.question.question}</Text>
       </View>
 
@@ -232,6 +229,7 @@ const styles = StyleSheet.create({
   progressTrack: { height: 7, backgroundColor: '#E7E3F5', borderRadius: 999, overflow: 'hidden', marginTop: 14 },
   progressFill: { height: '100%', backgroundColor: '#12B3A8' },
   questionCard: { backgroundColor: '#1D1A34', borderRadius: 22, padding: 22, marginTop: 20 },
+  bankBadge: { color: '#64D8CF', fontSize: 9, fontWeight: '900', letterSpacing: 1, marginBottom: 8 },
   questionText: { color: '#FFFFFF', fontSize: 21, lineHeight: 29, fontWeight: '800' },
   options: { gap: 9, marginTop: 14 },
   option: { backgroundColor: '#FFFFFF', borderRadius: 15, padding: 15, borderWidth: 1, borderColor: '#E7E3F5' },
