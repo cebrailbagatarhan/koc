@@ -1,0 +1,54 @@
+name: Android APK
+
+on:
+  push:
+    branches:
+      - v5-test-apk
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prebuild Android
+        run: npx expo prebuild --platform android --non-interactive --clean
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Prepare APK
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/Koc-v5-test.apk
+          sha256sum dist/Koc-v5-test.apk > dist/Koc-v5-test.apk.sha256
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Koc-v5-test-apk
+          path: |
+            dist/Koc-v5-test.apk
+            dist/Koc-v5-test.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
