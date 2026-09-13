@@ -21,6 +21,7 @@ export type BankQuestion = QuizQuestion & {
   visual?: QuestionVisualSpec;
   topicName: string | null;
   origin: string;
+  skillKey: string;
   qualityScore: number;
   confidence: 'high' | 'medium' | 'low';
 };
