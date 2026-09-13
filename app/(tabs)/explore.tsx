@@ -4,6 +4,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { getProgress, getSources, type CourseProgress, type LocalSource } from '@/storage/learningStore';
+import { getQuestionCoverage, type QuestionCoverageItem } from '@/storage/questionBankStore';
 import { getReviewDashboard, type ReviewDashboard } from '@/storage/reviewStore';
 
 const initialReview: ReviewDashboard = { dueCount: 0, trackedCount: 0, nextDueAt: null, weakCourses: [] };
@@ -12,16 +13,18 @@ export default function ProgressScreen() {
   const [progress, setProgress] = useState<CourseProgress[]>([]);
   const [sources, setSources] = useState<LocalSource[]>([]);
   const [review, setReview] = useState<ReviewDashboard>(initialReview);
+  const [coverage, setCoverage] = useState<QuestionCoverageItem[]>([]);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      Promise.all([getProgress(), getSources(), getReviewDashboard()]).then(
-        ([nextProgress, nextSources, nextReview]) => {
+      Promise.all([getProgress(), getSources(), getReviewDashboard(), getQuestionCoverage()]).then(
+        ([nextProgress, nextSources, nextReview, nextCoverage]) => {
           if (!active) return;
           setProgress(nextProgress);
           setSources(nextSources);
           setReview(nextReview);
+          setCoverage(nextCoverage);
         },
       );
       return () => {
@@ -38,6 +41,22 @@ export default function ProgressScreen() {
   }, [progress]);
 
   const weakest = review.weakCourses[0];
+  const questionHealth = useMemo(() => {
+    const totalQuestions = coverage.reduce((sum, item) => sum + item.questionCount, 0);
+    const averageQuality = coverage.length
+      ? Math.round(coverage.reduce((sum, item) => sum + item.averageQuality, 0) / coverage.length)
+      : 0;
+    const weakTopics = coverage.filter((item) =>
+      item.questionCount < 8
+      || item.averageQuality < 85
+      || (item.questionCount >= 10 && item.hardCount === 0)
+    );
+    return {
+      totalQuestions,
+      averageQuality,
+      weakTopics,
+    };
+  }, [coverage]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -57,6 +76,36 @@ export default function ProgressScreen() {
           <Text style={styles.summaryValue}>{review.dueCount}</Text>
           <Text style={styles.summaryLabel}>bekleyen tekrar</Text>
         </View>
+      </View>
+
+      <View style={styles.questionHealthCard}>
+        <View style={styles.questionHealthHeader}>
+          <View>
+            <Text style={styles.questionHealthEyebrow}>SORU BANKASI SAĞLIĞI</Text>
+            <Text style={styles.questionHealthTitle}>Kapsam ve kalite kontrolü</Text>
+          </View>
+          <Text style={styles.questionHealthScore}>{questionHealth.averageQuality || '—'}</Text>
+        </View>
+        <Text style={styles.questionHealthText}>
+          {questionHealth.totalQuestions} konu eşleşmeli soru · {questionHealth.weakTopics.length} konu iyileştirme bekliyor.
+        </Text>
+        {questionHealth.weakTopics.slice(0, 3).map((item) => (
+          <TouchableOpacity
+            key={`${item.levelName}-${item.courseName}-${item.topicName}`}
+            style={styles.questionHealthItem}
+            onPress={() => router.push(`/topic/${item.levelName}/${item.courseName}/${item.topicName}`)}>
+            <View style={styles.questionHealthItemBody}>
+              <Text style={styles.questionHealthItemTitle}>{item.topicName}</Text>
+              <Text style={styles.questionHealthItemMeta}>
+                {item.courseName} · {item.questionCount} soru · kalite {item.averageQuality}
+              </Text>
+            </View>
+            <Text style={styles.questionHealthArrow}>→</Text>
+          </TouchableOpacity>
+        ))}
+        {questionHealth.weakTopics.length === 0 && coverage.length > 0 ? (
+          <Text style={styles.questionHealthHealthy}>Tüm aktif konular temel kapsam eşiğini karşılıyor.</Text>
+        ) : null}
       </View>
 
       <View style={styles.reviewCard}>
@@ -143,6 +192,18 @@ const styles = StyleSheet.create({
   summaryCard: { flex: 1, backgroundColor: '#FFFFFF', padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#E7E3F5' },
   summaryValue: { color: '#12B3A8', fontSize: 22, fontWeight: '800' },
   summaryLabel: { color: '#6B6684', fontSize: 10, marginTop: 3 },
+  questionHealthCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#E2E5EC', marginBottom: 12 },
+  questionHealthHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
+  questionHealthEyebrow: { color: '#2563EB', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
+  questionHealthTitle: { color: '#111827', fontSize: 16, fontWeight: '900', marginTop: 3 },
+  questionHealthScore: { color: '#065F46', backgroundColor: '#D1FAE5', minWidth: 44, textAlign: 'center', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, fontSize: 13, fontWeight: '900' },
+  questionHealthText: { color: '#64748B', fontSize: 11, lineHeight: 16, marginTop: 8 },
+  questionHealthItem: { flexDirection: 'row', alignItems: 'center', marginTop: 9, paddingTop: 9, borderTopWidth: 1, borderTopColor: '#EEF0F4' },
+  questionHealthItemBody: { flex: 1 },
+  questionHealthItemTitle: { color: '#111827', fontSize: 12, fontWeight: '900' },
+  questionHealthItemMeta: { color: '#7A8494', fontSize: 9, marginTop: 2 },
+  questionHealthArrow: { color: '#2563EB', fontSize: 18, fontWeight: '900' },
+  questionHealthHealthy: { color: '#047857', fontSize: 10, fontWeight: '800', marginTop: 10 },
   reviewCard: { backgroundColor: '#1D1A34', borderRadius: 20, padding: 17, marginBottom: 12 },
   reviewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
   reviewEyebrow: { color: '#CBB5E8', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
