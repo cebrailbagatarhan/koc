@@ -86,6 +86,24 @@ async function initializeDatabase() {
 
     INSERT OR IGNORE INTO activity_stats(id, streak_days, last_study_date, total_study_actions)
       VALUES(1, 0, NULL, 0);
+
+    CREATE TABLE IF NOT EXISTS learner_profiles (
+      id TEXT PRIMARY KEY NOT NULL,
+      display_name TEXT NOT NULL,
+      level_name TEXT,
+      daily_minutes INTEGER NOT NULL DEFAULT 25,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS learner_preferences (
+      learner_id TEXT NOT NULL,
+      key TEXT NOT NULL,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY(learner_id, key),
+      FOREIGN KEY(learner_id) REFERENCES learner_profiles(id) ON DELETE CASCADE
+    );
   `);
 
   try {
@@ -109,7 +127,7 @@ async function initializeDatabase() {
   await db.runAsync(
     'INSERT OR REPLACE INTO app_meta(key, value) VALUES(?, ?)',
     'schema_version',
-    '2',
+    '3',
   );
 
   return db;
