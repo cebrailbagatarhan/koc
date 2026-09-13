@@ -12,7 +12,7 @@ import { getTopicsForCatalogCourse } from '@/data/topicCatalog';
 import { getLearningDatabase } from '@/storage/database';
 
 const EMBEDDED_PACKAGE_ID = 'embedded-core';
-const EMBEDDED_PACKAGE_VERSION = 4;
+const EMBEDDED_PACKAGE_VERSION = 5;
 const SEED_META_KEY = 'embedded_question_bank_version';
 
 export type BankQuestion = QuizQuestion & {
