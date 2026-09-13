@@ -2,7 +2,7 @@ export default {
   "expo": {
     "name": "kocumai",
     "slug": "kocumai",
-    "version": "10.4.0",
+    "version": "10.5.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "kocumai",
@@ -19,7 +19,7 @@ export default {
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "package": "com.kocumai.app",
-      "versionCode": 104,
+      "versionCode": 105,
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
