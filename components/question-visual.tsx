@@ -34,6 +34,7 @@ function visibleValue(value: string | number, hiddenAnswer?: string) {
 
 export function QuestionVisual({ visual, hiddenAnswer }: QuestionVisualProps) {
   if (!visual) return null;
+  if (hiddenAnswer !== undefined) return null;
 
   if (visual.kind === 'number-line') {
     const span = Math.max(1, visual.max - visual.min);
