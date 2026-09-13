@@ -21,6 +21,8 @@ export type BankQuestion = QuizQuestion & {
   visual?: QuestionVisualSpec;
   topicName: string | null;
   origin: string;
+  qualityScore: number;
+  confidence: 'high' | 'medium' | 'low';
 };
 
 export type QuestionBankStats = {
@@ -28,6 +30,18 @@ export type QuestionBankStats = {
   visualQuestionCount: number;
   courseCount: number;
   packageVersion: number;
+};
+
+export type QuestionCoverageItem = {
+  levelName: string;
+  courseName: string;
+  topicName: string;
+  questionCount: number;
+  highQualityCount: number;
+  averageQuality: number;
+  easyCount: number;
+  standardCount: number;
+  hardCount: number;
 };
 
 type QuestionRow = {
@@ -39,6 +53,8 @@ type QuestionRow = {
   visual_json: string | null;
   topic_name: string | null;
   origin: string;
+  quality_score: number;
+  confidence: 'high' | 'medium' | 'low';
 };
 
 type OptionRow = {
@@ -81,6 +97,8 @@ async function ensureSchema() {
       difficulty TEXT NOT NULL DEFAULT 'standard',
       question_kind TEXT NOT NULL DEFAULT 'multiple-choice',
       visual_json TEXT,
+      quality_score INTEGER NOT NULL DEFAULT 70,
+      confidence TEXT NOT NULL DEFAULT 'medium',
       status TEXT NOT NULL DEFAULT 'verified',
       version INTEGER NOT NULL DEFAULT 1,
       updated_at TEXT NOT NULL,
@@ -105,7 +123,33 @@ async function ensureSchema() {
 
   await ensureColumn(db, 'question_bank', 'question_kind', "TEXT NOT NULL DEFAULT 'multiple-choice'");
   await ensureColumn(db, 'question_bank', 'visual_json', 'TEXT');
+  await ensureColumn(db, 'question_bank', 'quality_score', 'INTEGER NOT NULL DEFAULT 70');
+  await ensureColumn(db, 'question_bank', 'confidence', "TEXT NOT NULL DEFAULT 'medium'");
   return db;
+}
+
+function scoreQuestion(input: {
+  prompt: string;
+  options: string[];
+  correctAnswer: string;
+  explanation: string;
+  origin?: string;
+  visual?: QuestionVisualSpec;
+}) {
+  let score = 55;
+  if (input.prompt.trim().length >= 12) score += 8;
+  if (input.explanation.trim().length >= 20) score += 10;
+  if (input.options.length === 4 && new Set(input.options).size === 4) score += 10;
+  if (input.options.includes(input.correctAnswer)) score += 10;
+  if (input.visual) score += 3;
+  if ((input.origin ?? 'embedded') === 'embedded') score += 4;
+  return Math.max(0, Math.min(100, score));
+}
+
+function confidenceForScore(score: number): 'high' | 'medium' | 'low' {
+  if (score >= 90) return 'high';
+  if (score >= 75) return 'medium';
+  return 'low';
 }
 
 async function insertQuestion(input: {
@@ -123,12 +167,20 @@ async function insertQuestion(input: {
   installedAt: string;
 }) {
   const db = await getLearningDatabase();
+  const qualityScore = scoreQuestion({
+    prompt: input.prompt,
+    options: input.options,
+    correctAnswer: input.correctAnswer,
+    explanation: input.explanation,
+    visual: input.visual,
+  });
+  const confidence = confidenceForScore(qualityScore);
   await db.runAsync(
     `INSERT INTO question_bank(
       id, package_id, origin, level_name, course_name, topic_name,
       prompt, explanation, difficulty, question_kind, visual_json,
-      status, version, updated_at
-    ) VALUES(?, ?, 'embedded', ?, ?, ?, ?, ?, ?, ?, ?, 'verified', 1, ?)`,
+      quality_score, confidence, status, version, updated_at
+    ) VALUES(?, ?, 'embedded', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'verified', 1, ?)`,
     input.id,
     EMBEDDED_PACKAGE_ID,
     input.levelName,
@@ -139,6 +191,8 @@ async function insertQuestion(input: {
     input.difficulty,
     input.questionKind,
     input.visual ? JSON.stringify(input.visual) : null,
+    qualityScore,
+    confidence,
     input.installedAt,
   );
 
@@ -269,11 +323,14 @@ async function hydrateQuestion(row: QuestionRow): Promise<BankQuestion | null> {
     visual,
     topicName: row.topic_name,
     origin: row.origin,
+    qualityScore: row.quality_score,
+    confidence: row.confidence,
   };
 }
 
 const QUESTION_SELECT = `
-  SELECT id, prompt, explanation, difficulty, question_kind, visual_json, topic_name, origin
+  SELECT id, prompt, explanation, difficulty, question_kind, visual_json, topic_name, origin,
+         quality_score, confidence
   FROM question_bank`;
 
 export async function getQuestionsFromDatabase(
@@ -337,4 +394,50 @@ export async function getQuestionBankStats(): Promise<QuestionBankStats> {
     courseCount: row?.course_count ?? 0,
     packageVersion: EMBEDDED_PACKAGE_VERSION,
   };
+}
+
+
+export async function getQuestionCoverage(): Promise<QuestionCoverageItem[]> {
+  await ensureEmbeddedQuestionBankSeeded();
+  const db = await ensureSchema();
+  const rows = await db.getAllAsync<{
+    level_name: string;
+    course_name: string;
+    topic_name: string | null;
+    question_count: number;
+    high_quality_count: number;
+    average_quality: number;
+    easy_count: number;
+    standard_count: number;
+    hard_count: number;
+  }>(
+    `SELECT
+       level_name,
+       course_name,
+       topic_name,
+       COUNT(*) AS question_count,
+       SUM(CASE WHEN quality_score >= 90 THEN 1 ELSE 0 END) AS high_quality_count,
+       ROUND(AVG(quality_score)) AS average_quality,
+       SUM(CASE WHEN difficulty = 'easy' THEN 1 ELSE 0 END) AS easy_count,
+       SUM(CASE WHEN difficulty = 'standard' THEN 1 ELSE 0 END) AS standard_count,
+       SUM(CASE WHEN difficulty = 'hard' THEN 1 ELSE 0 END) AS hard_count
+     FROM question_bank
+     WHERE status = 'verified'
+     GROUP BY level_name, course_name, topic_name
+     ORDER BY question_count ASC, average_quality ASC`,
+  );
+
+  return rows
+    .filter((row) => Boolean(row.topic_name))
+    .map((row) => ({
+      levelName: row.level_name,
+      courseName: row.course_name,
+      topicName: row.topic_name ?? 'Genel',
+      questionCount: Number(row.question_count ?? 0),
+      highQualityCount: Number(row.high_quality_count ?? 0),
+      averageQuality: Number(row.average_quality ?? 0),
+      easyCount: Number(row.easy_count ?? 0),
+      standardCount: Number(row.standard_count ?? 0),
+      hardCount: Number(row.hard_count ?? 0),
+    }));
 }
