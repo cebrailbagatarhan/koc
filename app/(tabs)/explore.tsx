@@ -5,6 +5,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 
 import { getProgress, getSources, type CourseProgress, type LocalSource } from '@/storage/learningStore';
 import { getReviewDashboard, type ReviewDashboard } from '@/storage/reviewStore';
+import { getQuestionCoverage, type QuestionCoverageItem } from '@/storage/questionQualityStore';
 
 const initialReview: ReviewDashboard = { dueCount: 0, trackedCount: 0, nextDueAt: null, weakCourses: [] };
 
@@ -12,16 +13,18 @@ export default function ProgressScreen() {
   const [progress, setProgress] = useState<CourseProgress[]>([]);
   const [sources, setSources] = useState<LocalSource[]>([]);
   const [review, setReview] = useState<ReviewDashboard>(initialReview);
+  const [coverage, setCoverage] = useState<QuestionCoverageItem[]>([]);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      Promise.all([getProgress(), getSources(), getReviewDashboard()]).then(
-        ([nextProgress, nextSources, nextReview]) => {
+      Promise.all([getProgress(), getSources(), getReviewDashboard(), getQuestionCoverage()]).then(
+        ([nextProgress, nextSources, nextReview, nextCoverage]) => {
           if (!active) return;
           setProgress(nextProgress);
           setSources(nextSources);
           setReview(nextReview);
+          setCoverage(nextCoverage);
         },
       );
       return () => {
@@ -38,6 +41,16 @@ export default function ProgressScreen() {
   }, [progress]);
 
   const weakest = review.weakCourses[0];
+  const questionHealth = useMemo(() => {
+    const totalQuestions = coverage.reduce((sum, item) => sum + item.questionCount, 0);
+    const averageQuality = coverage.length
+      ? Math.round(coverage.reduce((sum, item) => sum + item.averageQuality, 0) / coverage.length)
+      : 0;
+    const weakSkills = coverage.filter(
+      (item) => item.questionCount < 8 || item.averageQuality < 85 || (item.questionCount >= 10 && item.hardCount === 0),
+    );
+    return { totalQuestions, averageQuality, weakSkills };
+  }, [coverage]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -57,6 +70,34 @@ export default function ProgressScreen() {
           <Text style={styles.summaryValue}>{review.dueCount}</Text>
           <Text style={styles.summaryLabel}>bekleyen tekrar</Text>
         </View>
+      </View>
+
+      <View style={styles.healthCard}>
+        <View style={styles.healthHeader}>
+          <View>
+            <Text style={styles.healthEyebrow}>SORU BANKASI SAĞLIĞI</Text>
+            <Text style={styles.healthTitle}>Kapsam ve kalite</Text>
+          </View>
+          <Text style={styles.healthScore}>{questionHealth.averageQuality || '—'}</Text>
+        </View>
+        <Text style={styles.healthText}>
+          {questionHealth.totalQuestions} konu-eşleşmeli soru · {questionHealth.weakSkills.length} beceri geliştirme bekliyor.
+        </Text>
+        {questionHealth.weakSkills.slice(0, 3).map((item) => (
+          <TouchableOpacity
+            key={`${item.levelName}-${item.courseName}-${item.skillLabel}`}
+            style={styles.healthItem}
+            onPress={() => router.push(`/topic/${item.levelName}/${item.courseName}/${item.skillLabel}`)}>
+            <View style={styles.healthItemBody}>
+              <Text style={styles.healthItemTitle}>{item.skillLabel}</Text>
+              <Text style={styles.healthItemMeta}>
+                {item.courseName} · {item.questionCount} soru · kalite {item.averageQuality}
+                {item.accuracy !== null ? ` · kullanıcı doğruluğu %${item.accuracy}` : ''}
+              </Text>
+            </View>
+            <Text style={styles.healthArrow}>→</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <View style={styles.reviewCard}>
@@ -143,6 +184,17 @@ const styles = StyleSheet.create({
   summaryCard: { flex: 1, backgroundColor: '#FFFFFF', padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#E7E3F5' },
   summaryValue: { color: '#12B3A8', fontSize: 22, fontWeight: '800' },
   summaryLabel: { color: '#6B6684', fontSize: 10, marginTop: 3 },
+  healthCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#E2E5EC', marginBottom: 12 },
+  healthHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
+  healthEyebrow: { color: '#2563EB', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
+  healthTitle: { color: '#111827', fontSize: 16, fontWeight: '900', marginTop: 3 },
+  healthScore: { color: '#065F46', backgroundColor: '#D1FAE5', minWidth: 44, textAlign: 'center', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, fontSize: 13, fontWeight: '900' },
+  healthText: { color: '#64748B', fontSize: 11, lineHeight: 16, marginTop: 8 },
+  healthItem: { flexDirection: 'row', alignItems: 'center', marginTop: 9, paddingTop: 9, borderTopWidth: 1, borderTopColor: '#EEF0F4' },
+  healthItemBody: { flex: 1 },
+  healthItemTitle: { color: '#111827', fontSize: 12, fontWeight: '900' },
+  healthItemMeta: { color: '#7A8494', fontSize: 9, marginTop: 2 },
+  healthArrow: { color: '#2563EB', fontSize: 18, fontWeight: '900' },
   reviewCard: { backgroundColor: '#1D1A34', borderRadius: 20, padding: 17, marginBottom: 12 },
   reviewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
   reviewEyebrow: { color: '#CBB5E8', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
