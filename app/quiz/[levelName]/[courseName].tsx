@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -23,12 +23,14 @@ export default function QuizScreen() {
     courseName: string;
     topicName?: string;
   }>();
+  const [availableQuestions, setAvailableQuestions] = useState<BankQuestion[]>([]);
   const [questionSet, setQuestionSet] = useState<BankQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [finished, setFinished] = useState(false);
+  const [wrongQuestionIds, setWrongQuestionIds] = useState<string[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -37,10 +39,14 @@ export default function QuizScreen() {
     setScore(0);
     setSelected(null);
     setFinished(false);
+    setWrongQuestionIds([]);
 
     getQuestionsFromDatabase(levelName, courseName, topicName)
       .then((questions) => {
-        if (active) setQuestionSet(shuffled(questions).slice(0, 10));
+        if (active) {
+          setAvailableQuestions(questions);
+          setQuestionSet(shuffled(questions).slice(0, 10));
+        }
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -58,7 +64,11 @@ export default function QuizScreen() {
     if (!question || selected || !levelName || !courseName) return;
     const correct = answer === question.correctAnswer;
     setSelected(answer);
-    if (correct) setScore((value) => value + 1);
+    if (correct) {
+      setScore((value) => value + 1);
+    } else {
+      setWrongQuestionIds((ids) => (ids.includes(question.id) ? ids : [...ids, question.id]));
+    }
     await recordQuizOutcome({
       levelName,
       courseName,
@@ -66,6 +76,26 @@ export default function QuizScreen() {
       correct,
       selectedAnswer: answer,
     });
+  };
+
+  const startSession = (questions: BankQuestion[]) => {
+    const nextSet = shuffled(questions).slice(0, 10);
+    setQuestionSet(nextSet);
+    setIndex(0);
+    setScore(0);
+    setSelected(null);
+    setFinished(false);
+    setWrongQuestionIds([]);
+  };
+
+  const handleRetryWrong = () => {
+    const wrongIds = new Set(wrongQuestionIds);
+    const wrongQuestions = questionSet.filter((item) => wrongIds.has(item.id));
+    if (wrongQuestions.length) startSession(wrongQuestions);
+  };
+
+  const handleNewQuiz = () => {
+    if (availableQuestions.length) startSession(availableQuestions);
   };
 
   const handleNext = async () => {
@@ -118,6 +148,19 @@ export default function QuizScreen() {
         <Text style={styles.emptyText}>
           Sonuç ilerlemeye kaydedildi. Yanlış sorular otomatik tekrar kuyruğuna eklendi.
         </Text>
+        <View style={styles.resultActions}>
+          {wrongQuestionIds.length ? (
+            <TouchableOpacity style={styles.retryButton} onPress={handleRetryWrong}>
+              <Text style={styles.retryButtonText}>Yanlışları hemen tekrar et ({wrongQuestionIds.length})</Text>
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity style={styles.nextButton} onPress={handleNewQuiz}>
+            <Text style={styles.nextButtonText}>Yeni quiz çöz</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => router.back()}>
+            <Text style={styles.secondaryButtonText}>Derse dön</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -229,4 +272,9 @@ const styles = StyleSheet.create({
   resultIcon: { fontSize: 58 },
   resultTitle: { color: '#1D1A34', fontSize: 28, fontWeight: '800', marginTop: 12 },
   resultPercent: { color: '#FF5C7C', fontSize: 20, fontWeight: '800', marginTop: 4 },
+  resultActions: { width: '100%', gap: 9, marginTop: 20 },
+  retryButton: { backgroundColor: '#12B3A8', borderRadius: 12, padding: 13, alignItems: 'center' },
+  retryButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 13 },
+  secondaryButton: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#E7E3F5' },
+  secondaryButtonText: { color: '#1D1A34', fontWeight: '800', fontSize: 13 },
 });
