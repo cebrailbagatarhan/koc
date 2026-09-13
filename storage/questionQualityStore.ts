@@ -37,9 +37,14 @@ function qualityScore(question: BankQuestion) {
 
 export async function getQuestionCoverage(): Promise<QuestionCoverageItem[]> {
   const db = await getLearningDatabase();
-  const attempts = await db.getAllAsync<AttemptRow>(
-    'SELECT question_id, correct FROM quiz_attempts',
-  );
+  let attempts: AttemptRow[] = [];
+  try {
+    attempts = await db.getAllAsync<AttemptRow>(
+      'SELECT question_id, correct FROM quiz_attempts',
+    );
+  } catch {
+    attempts = [];
+  }
   const attemptMap = new Map<string, { attempts: number; correct: number }>();
 
   for (const attempt of attempts) {
