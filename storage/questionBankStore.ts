@@ -1,4 +1,5 @@
 import { getAllCourseKeys } from '@/data/courseCatalog';
+import { getDeterministicQuestionPackV104 } from '@/data/deterministicQuestionFactoryV104';
 import {
   getEmbeddedQuestionPackV10,
   type QuestionDifficulty,
@@ -10,7 +11,7 @@ import { getTopicsForCatalogCourse } from '@/data/topicCatalog';
 import { getLearningDatabase } from '@/storage/database';
 
 const EMBEDDED_PACKAGE_ID = 'embedded-core';
-const EMBEDDED_PACKAGE_VERSION = 2;
+const EMBEDDED_PACKAGE_VERSION = 3;
 const SEED_META_KEY = 'embedded_question_bank_version';
 
 export type BankQuestion = QuizQuestion & {
@@ -202,7 +203,10 @@ export async function ensureEmbeddedQuestionBankSeeded() {
       }
     }
 
-    for (const question of getEmbeddedQuestionPackV10()) {
+    for (const question of [
+      ...getEmbeddedQuestionPackV10(),
+      ...getDeterministicQuestionPackV104(),
+    ]) {
       const topics = getTopicsForCatalogCourse(question.levelName, question.courseName);
       const topicName = topics.length
         ? topics[(question.topicIndex ?? 0) % topics.length]?.name ?? null
