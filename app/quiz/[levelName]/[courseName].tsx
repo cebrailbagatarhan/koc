@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { QuestionVisual } from '@/components/question-visual';
+import { getAdaptiveQuestionSession } from '@/storage/adaptiveQuestionStore';
 import { completeDailyPlanTopic } from '@/storage/coachStore';
 import { getQuestionsFromDatabase, type BankQuestion } from '@/storage/questionBankStore';
 import { recordQuizOutcome } from '@/storage/reviewStore';
@@ -41,11 +42,14 @@ export default function QuizScreen() {
     setFinished(false);
     setWrongQuestionIds([]);
 
-    getQuestionsFromDatabase(levelName, courseName, topicName)
-      .then((questions) => {
+    Promise.all([
+      getQuestionsFromDatabase(levelName, courseName, topicName),
+      getAdaptiveQuestionSession(levelName, courseName, topicName, 10),
+    ])
+      .then(([questions, adaptiveQuestions]) => {
         if (active) {
           setAvailableQuestions(questions);
-          setQuestionSet(shuffled(questions).slice(0, 10));
+          setQuestionSet(adaptiveQuestions);
         }
       })
       .finally(() => {
