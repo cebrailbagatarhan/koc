@@ -54,6 +54,7 @@ type QuestionRow = {
   visual_json: string | null;
   topic_name: string | null;
   origin: string;
+  skill_key: string;
   quality_score: number;
   confidence: 'high' | 'medium' | 'low';
 };
