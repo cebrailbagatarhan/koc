@@ -1,0 +1,13 @@
+{
+  "name": "koc-pdf-text-extract",
+  "version": "1.0.0",
+  "description": "Koç local Expo module for extracting text from digital PDF sources.",
+  "main": "src/index.ts",
+  "license": "MIT",
+  "author": "Koç project; native implementation adapted from expo-pdf-text-extract (MIT)",
+  "homepage": "https://github.com/cebrailbagatarhan/koc",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cebrailbagatarhan/koc.git"
+  }
+}
