@@ -65,9 +65,12 @@ export default function ReviewScreen() {
   );
 
   const current = queue[index];
+  // Count only answered questions: opening a question must not advance progress.
+  const answeredCount = Math.min(queue.length, index + (selected !== null ? 1 : 0));
+  const remainingCount = queue.length - answeredCount;
   const progress = useMemo(
-    () => (queue.length ? Math.round(((index + 1) / queue.length) * 100) : 0),
-    [index, queue.length],
+    () => (queue.length ? Math.round((answeredCount / queue.length) * 100) : 0),
+    [answeredCount, queue.length],
   );
 
   const handleAnswer = async (answer: string) => {
@@ -173,6 +176,9 @@ export default function ReviewScreen() {
       <View style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: `${progress}%` }]} />
       </View>
+      <Text style={styles.progressCaption} accessibilityRole="text">
+        {answeredCount} soru yanıtlandı · {remainingCount} soru kaldı
+      </Text>
 
       <View style={styles.questionCard}>
         <Text style={styles.bankBadge}>✓ YEREL SORU BANKASI</Text>
@@ -232,6 +238,7 @@ const styles = StyleSheet.create({
   wrongBadge: { color: '#9B5DE5', backgroundColor: '#EFE6FA', paddingHorizontal: 11, paddingVertical: 7, borderRadius: 999, fontWeight: '800' },
   progressTrack: { height: 7, backgroundColor: '#E7E3F5', borderRadius: 999, overflow: 'hidden', marginTop: 14 },
   progressFill: { height: '100%', backgroundColor: '#12B3A8' },
+  progressCaption: { color: '#6B6684', fontSize: 11, fontWeight: '700', marginTop: 7 },
   questionCard: { backgroundColor: '#1D1A34', borderRadius: 22, padding: 22, marginTop: 20 },
   bankBadge: { color: '#64D8CF', fontSize: 9, fontWeight: '900', letterSpacing: 1, marginBottom: 8 },
   questionText: { color: '#FFFFFF', fontSize: 21, lineHeight: 29, fontWeight: '800' },
