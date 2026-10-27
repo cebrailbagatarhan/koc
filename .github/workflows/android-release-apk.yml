@@ -1,0 +1,64 @@
+name: Android ARM64 Release APK
+
+on:
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: TypeScript
+        run: npx tsc --noEmit
+
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --clean --no-install --non-interactive
+
+      - name: Build ARM64 release APK
+        working-directory: android
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+
+      - name: Verify release APK
+        run: |
+          test -f android/app/build/outputs/apk/release/app-release.apk
+          unzip -l android/app/build/outputs/apk/release/app-release.apk | grep -q "lib/arm64-v8a/"
+          if unzip -l android/app/build/outputs/apk/release/app-release.apk | grep -q "lib/x86"; then
+            echo "Unexpected x86 ABI in ARM64 build"
+            exit 1
+          fi
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk Koc-v11.0.0-arm64-release.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Koc-v11.0.0-arm64-release
+          path: Koc-v11.0.0-arm64-release.apk
+          if-no-files-found: error
