@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import { LEVELS } from '@/data/courseCatalog';
+import { estimateGoalWorkload } from '@/utils/goalWorkload';
 import {
   clearStudyGoal,
   getActiveGoal,
@@ -61,6 +62,7 @@ export default function GoalsScreen() {
     [levelName],
   );
   const daysRemaining = getDaysRemaining(targetDate);
+  const workload = useMemo(() => estimateGoalWorkload(targetDate, dailyMinutes), [targetDate, dailyMinutes]);
 
   const handleSave = async () => {
     try {
@@ -204,6 +206,18 @@ export default function GoalsScreen() {
         ))}
       </View>
 
+      <View style={styles.workloadCard}>
+        <Text style={styles.workloadTitle}>Planlanan toplam çalışma süresi</Text>
+        <Text style={styles.workloadText}>
+          {!workload
+            ? 'Önizleme için geçerli bir hedef tarihi gir.'
+            : workload.days === 0
+              ? 'Hedef tarihi geçmiş; yeni bir tarih seç.'
+              : `${workload.days} gün × ${dailyMinutes} dk = ${Math.floor(workload.totalMinutes / 60)} sa ${workload.totalMinutes % 60} dk`}
+        </Text>
+        <Text style={styles.workloadNote}>Her gün çalışıldığı varsayılır; gerçekleşen çalışma süresi değildir.</Text>
+      </View>
+
       <View style={styles.infoCard}>
         <Text style={styles.infoTitle}>Plan nasıl değişecek?</Text>
         <Text style={styles.infoText}>
@@ -251,6 +265,10 @@ const styles = StyleSheet.create({
   minuteValueSelected: { color: '#0E716B' },
   minuteLabel: { color: '#8B859E', fontSize: 9, marginTop: 1 },
   minuteLabelSelected: { color: '#0E716B' },
+  workloadCard: { backgroundColor: '#FFFFFF', borderRadius: 17, padding: 15, borderWidth: 1, borderColor: '#E1DDED', marginTop: 16 },
+  workloadTitle: { color: '#1D1A34', fontSize: 12, fontWeight: '900' },
+  workloadText: { color: '#0E716B', fontSize: 15, fontWeight: '800', marginTop: 6 },
+  workloadNote: { color: '#6B6684', fontSize: 11, marginTop: 5 },
   infoCard: { backgroundColor: '#FFF5D8', borderRadius: 17, padding: 15, borderWidth: 1, borderColor: '#F4D782', marginTop: 20 },
   infoTitle: { color: '#75500A', fontSize: 12, fontWeight: '900' },
   infoText: { color: '#735F31', fontSize: 11, lineHeight: 17, marginTop: 5 },

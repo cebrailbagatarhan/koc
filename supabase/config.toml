@@ -1,0 +1,8 @@
+[functions.revenuecat-webhook]
+verify_jwt = false
+
+[functions.grounded-study]
+verify_jwt = true
+
+[functions.check-answer]
+verify_jwt = true
