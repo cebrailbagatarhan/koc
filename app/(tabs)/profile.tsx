@@ -3,6 +3,7 @@ import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { LEVELS } from '@/data/courseCatalog';
+import { formatWeeklyStudyTime } from '@/utils/goalWorkload';
 import { ensureActiveLearner, updateLearnerProfile, type LearnerProfile } from '@/storage/userStore';
 
 export default function ProfileScreen() {
@@ -92,6 +93,10 @@ export default function ProfileScreen() {
           })}
         </View>
 
+        <Text style={styles.weeklyHint} accessibilityRole="text">
+          Her gün bu hedefe ulaşırsan haftada {formatWeeklyStudyTime(dailyMinutes)} çalışmış olursun.
+        </Text>
+
         <TouchableOpacity style={styles.saveButton} onPress={save}>
           <Text style={styles.saveButtonText}>{saved ? 'Kaydedildi ✓' : 'Profili kaydet'}</Text>
         </TouchableOpacity>
@@ -129,6 +134,7 @@ const styles = StyleSheet.create({
   minuteButtonActive: { backgroundColor: '#D1FAE5', borderColor: '#6EE7B7' },
   minuteText: { color: '#4B5563', fontSize: 11, fontWeight: '900' },
   minuteTextActive: { color: '#065F46' },
+  weeklyHint: { color: '#475569', fontSize: 12, lineHeight: 18, marginTop: 12 },
   saveButton: { backgroundColor: '#2563EB', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
   saveButtonText: { color: '#FFFFFF', fontWeight: '900', fontSize: 14 },
   infoCard: { backgroundColor: '#E8EEF9', borderRadius: 18, padding: 16, marginTop: 12 },
