@@ -1,0 +1,38 @@
+name: Validate client security
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Reject client-side provider secrets
+        run: npm run test:security
+
+      - name: Lint application
+        run: npm run lint
+
+      - name: Type-check application
+        run: npx --no-install tsc --noEmit
