@@ -19,3 +19,15 @@ export function estimateGoalWorkload(
   const days = Math.max(0, Math.round((targetUtc - todayUtc) / 86_400_000) + 1);
   return { days, totalMinutes: days * Math.round(dailyMinutes) };
 }
+
+/** Format a seven-day target without changing the saved daily goal. */
+export function formatWeeklyStudyTime(dailyMinutes: number): string | null {
+  if (!Number.isFinite(dailyMinutes) || dailyMinutes <= 0) return null;
+  const weeklyMinutes = Math.round(dailyMinutes) * 7;
+  if (!Number.isSafeInteger(weeklyMinutes) || weeklyMinutes <= 0) return null;
+  const hours = Math.floor(weeklyMinutes / 60);
+  const minutes = weeklyMinutes % 60;
+  return [hours ? `${hours} sa` : '', minutes ? `${minutes} dk` : '']
+    .filter(Boolean)
+    .join(' ');
+}
