@@ -4,6 +4,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { QuestionVisual } from '@/components/question-visual';
+import { getReviewAccuracyPercentage } from '@/utils/reviewAccuracy';
 import { completeDailyPlanReview } from '@/storage/coachStore';
 import { getQuestionFromDatabase, type BankQuestion } from '@/storage/questionBankStore';
 import {
@@ -68,6 +69,7 @@ export default function ReviewScreen() {
   // Count only answered questions: opening a question must not advance progress.
   const answeredCount = Math.min(queue.length, index + (selected !== null ? 1 : 0));
   const remainingCount = queue.length - answeredCount;
+  const accuracy = getReviewAccuracyPercentage(correctCount, queue.length);
   const progress = useMemo(
     () => (queue.length ? Math.round((answeredCount / queue.length) * 100) : 0),
     [answeredCount, queue.length],
@@ -117,6 +119,7 @@ export default function ReviewScreen() {
           <Text style={styles.bigIcon}>✅</Text>
           <Text style={styles.finishTitle}>Tekrar oturumu tamamlandı</Text>
           <Text style={styles.finishScore}>{correctCount}/{queue.length} doğru</Text>
+          {accuracy !== null ? <Text style={styles.accuracyText}>Başarı oranı: %{accuracy}</Text> : null}
           <Text style={styles.muted}>
             Doğru bildiğin soruların tekrar aralığı uzatıldı. Yanlışlar daha erken tekrar karşısına çıkacak.
           </Text>
@@ -256,6 +259,7 @@ const styles = StyleSheet.create({
   doneCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: '#E7E3F5', marginTop: 22 },
   finishTitle: { color: '#1D1A34', fontSize: 22, fontWeight: '900', textAlign: 'center', marginTop: 10 },
   finishScore: { color: '#12B3A8', fontSize: 28, fontWeight: '900', marginTop: 8 },
+  accuracyText: { color: '#0E716B', fontSize: 15, fontWeight: '800', marginTop: 4 },
   muted: { color: '#6B6684', fontSize: 13, lineHeight: 19, marginTop: 8 },
   coachCard: { backgroundColor: '#FFF5D8', borderRadius: 20, padding: 18, marginTop: 14, borderWidth: 1, borderColor: '#F4D782' },
   coachEyebrow: { color: '#A66B00', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
