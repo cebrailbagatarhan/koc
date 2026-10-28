@@ -34,5 +34,5 @@ jobs:
       - name: TypeScript
         run: npx tsc --noEmit
 
-      - name: Goal workload unit tests
-        run: node --test tests/goal-workload.test.cjs
+      - name: Utility unit tests
+        run: node --test tests/*.test.cjs
