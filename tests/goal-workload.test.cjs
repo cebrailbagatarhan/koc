@@ -14,7 +14,7 @@ const compiled = new Module(filename, module);
 compiled.filename = filename;
 compiled.paths = module.paths;
 compiled._compile(js, filename);
-const { estimateGoalWorkload } = compiled.exports;
+const { estimateGoalWorkload, getGoalTargetWeekday } = compiled.exports;
 const today = new Date(2026, 9, 27, 15);
 
 test('includes today and the target day in the preview', () => {
@@ -35,4 +35,15 @@ test('rejects invalid dates and non-finite study time', () => {
 });
 test('uses calendar days rather than elapsed 24-hour blocks', () => {
   assert.deepEqual(estimateGoalWorkload('2024-03-01', 20, new Date(2024, 1, 28, 23)), { days: 3, totalMinutes: 60 });
+});
+
+test('goal target weekday uses Turkish calendar names', () => {
+  assert.equal(getGoalTargetWeekday('2026-10-29'), 'Perşembe');
+  assert.equal(getGoalTargetWeekday('2024-02-29'), 'Perşembe');
+  assert.equal(getGoalTargetWeekday('2026-11-01'), 'Pazar');
+});
+test('invalid target dates have no weekday label', () => {
+  for (const value of ['2026-02-30', '2026-13-01', 'not-a-date', '2026-1-01']) {
+    assert.equal(getGoalTargetWeekday(value), null);
+  }
 });
