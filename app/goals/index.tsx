@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 
 import { LEVELS } from '@/data/courseCatalog';
-import { estimateGoalWorkload } from '@/utils/goalWorkload';
+import { estimateGoalWorkload, getGoalTargetWeekday } from '@/utils/goalWorkload';
 import {
   clearStudyGoal,
   getActiveGoal,
@@ -63,6 +63,7 @@ export default function GoalsScreen() {
   );
   const daysRemaining = getDaysRemaining(targetDate);
   const workload = useMemo(() => estimateGoalWorkload(targetDate, dailyMinutes), [targetDate, dailyMinutes]);
+  const targetWeekday = useMemo(() => getGoalTargetWeekday(targetDate), [targetDate]);
 
   const handleSave = async () => {
     try {
@@ -215,6 +216,7 @@ export default function GoalsScreen() {
               ? 'Hedef tarihi geçmiş; yeni bir tarih seç.'
               : `${workload.days} gün × ${dailyMinutes} dk = ${Math.floor(workload.totalMinutes / 60)} sa ${workload.totalMinutes % 60} dk`}
         </Text>
+        {targetWeekday ? <Text style={styles.workloadNote}>Hedef günü: {targetWeekday}</Text> : null}
         <Text style={styles.workloadNote}>Her gün çalışıldığı varsayılır; gerçekleşen çalışma süresi değildir.</Text>
       </View>
 
