@@ -19,3 +19,11 @@ export function estimateGoalWorkload(
   const days = Math.max(0, Math.round((targetUtc - todayUtc) / 86_400_000) + 1);
   return { days, totalMinutes: days * Math.round(dailyMinutes) };
 }
+
+/** Weekday of a valid goal date, independent of the device's timezone. */
+export function getGoalTargetWeekday(targetDate: string): string | null {
+  if (estimateGoalWorkload(targetDate, 1) === null) return null;
+  const [year, month, day] = targetDate.split('-').map(Number);
+  const weekdays = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+  return weekdays[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
+}
