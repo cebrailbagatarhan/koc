@@ -58,6 +58,26 @@ export const LEVELS: LevelDefinition[] = [
       { name: 'Sözel', icon: '🗣️', description: 'Paragraf ve sözel akıl yürütme' },
     ],
   },
+  {
+    name: 'ÖSYM',
+    icon: '🏛️',
+    description: 'TYT, AYT ve KPSS sınav formatı',
+    courses: [
+      { name: 'TYT', icon: '📝', description: 'Temel Yeterlilik Testi · Türkçe, matematik, fen, sosyal' },
+      { name: 'AYT Sayısal', icon: '📐', description: 'Alan Yeterlilik Testi · matematik ve fen bilimleri' },
+      { name: 'AYT Eşit Ağırlık', icon: '📚', description: 'Alan Yeterlilik Testi · matematik, edebiyat, tarih, coğrafya' },
+      { name: 'KPSS', icon: '🗂️', description: 'Genel yetenek ve genel kültür' },
+    ],
+  },
+  {
+    name: 'YÖK',
+    icon: '🎓',
+    description: 'YÖKDİL ve üniversite ders formatı',
+    courses: [
+      { name: 'YÖKDİL', icon: '🌐', description: 'Akademik İngilizce · fen, sağlık, sosyal' },
+      { name: 'Akademik', icon: '🏫', description: 'Vize-final formatı · iktisat, hukuk, mühendislik' },
+    ],
+  },
 ];
 
 export const COURSES_BY_LEVEL: Record<string, CourseDefinition[]> = Object.fromEntries(

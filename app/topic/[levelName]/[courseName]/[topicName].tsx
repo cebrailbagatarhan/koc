@@ -1,9 +1,9 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { getTopic } from '@/data/topicCatalog';
-import { getQuizQuestionsForTopic } from '@/data/topicQuiz';
+import { getQuestionsFromDatabase } from '@/storage/questionBankStore';
 import { recordTopicVisit } from '@/storage/coachStore';
 import { recordCourseSession, searchSourcesForCourse, type LocalSource } from '@/storage/learningStore';
 
@@ -14,10 +14,7 @@ export default function TopicScreen() {
     topicName: string;
   }>();
   const topic = getTopic(levelName, courseName, topicName);
-  const questionCount = useMemo(
-    () => getQuizQuestionsForTopic(levelName, courseName, topicName).length,
-    [courseName, levelName, topicName],
-  );
+  const [questionCount, setQuestionCount] = useState(0);
   const [sources, setSources] = useState<LocalSource[]>([]);
 
   useEffect(() => {
@@ -25,6 +22,9 @@ export default function TopicScreen() {
     recordCourseSession(levelName, courseName);
     recordTopicVisit(levelName, courseName, topicName);
     searchSourcesForCourse(levelName, courseName, '', topicName).then(setSources);
+    getQuestionsFromDatabase(levelName, courseName, topicName)
+      .then((questions) => setQuestionCount(questions.length))
+      .catch(() => setQuestionCount(0));
   }, [courseName, levelName, topicName]);
 
   if (!topic) {

@@ -57,6 +57,17 @@ function numericQuestion(input: NumericFactoryInput): EmbeddedQuestionSeed {
   };
 }
 
+function gcd(a: number, b: number): number {
+  let x = Math.abs(a);
+  let y = Math.abs(b);
+  while (y !== 0) {
+    const rest = x % y;
+    x = y;
+    y = rest;
+  }
+  return x || 1;
+}
+
 function validateQuestion(question: EmbeddedQuestionSeed) {
   if (!question.id || !question.prompt.trim() || !question.explanation.trim()) {
     throw new Error(`Incomplete generated question: ${question.id}`);
@@ -190,15 +201,18 @@ function makeMiddleMathFactory(): EmbeddedQuestionSeed[] {
     const scale = 2 + (i % 5);
     const a = first * scale;
     const b = second * scale;
+    const divisor = gcd(a, b);
+    const simpleFirst = a / divisor;
+    const simpleSecond = b / divisor;
     result.push(numericQuestion({
       id: `v104-om-ratio-${i + 1}`,
       levelName: 'Ortaokul',
       courseName: 'Matematik',
       topicIndex: 1,
       prompt: `${a}:${b} oranının en sade hâlinde ilk terim kaçtır?`,
-      answer: first,
-      distractors: [second, scale, first + 1],
-      explanation: `${a}:${b} oranı ${scale}'e bölünerek ${first}:${second} olur.`,
+      answer: simpleFirst,
+      distractors: [divisor, simpleFirst + 1, simpleFirst + 2],
+      explanation: `${a}:${b} oranının iki terimi de ${divisor} ile bölünür; en sade hâli ${simpleFirst}:${simpleSecond} olur.`,
       difficulty: 'standard',
     }));
   }
@@ -358,5 +372,11 @@ export function getDeterministicQuestionPackV104(): EmbeddedQuestionSeed[] {
     ids.add(question.id);
   }
 
-  return generated;
+  const prompts = new Set<string>();
+  return generated.filter((question) => {
+    const key = question.prompt.replace(/\s+/g, ' ').trim().toLocaleLowerCase('tr');
+    if (prompts.has(key)) return false;
+    prompts.add(key);
+    return true;
+  });
 }

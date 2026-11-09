@@ -8,11 +8,12 @@ import {
   type QuestionVisualSpec,
 } from '@/data/embeddedQuestionPackV10';
 import { getQuizQuestions, type QuizQuestion } from '@/data/offlineContent';
+import { getOsymYokQuestionPack } from '@/data/osymYokPack';
 import { getTopicsForCatalogCourse } from '@/data/topicCatalog';
 import { getLearningDatabase } from '@/storage/database';
 
 const EMBEDDED_PACKAGE_ID = 'embedded-core';
-const EMBEDDED_PACKAGE_VERSION = 4;
+const EMBEDDED_PACKAGE_VERSION = 5;
 const SEED_META_KEY = 'embedded_question_bank_version';
 
 export type BankQuestion = QuizQuestion & {
@@ -208,11 +209,12 @@ export async function ensureEmbeddedQuestionBankSeeded() {
       ...getEmbeddedQuestionPackV10(),
       ...getDeterministicQuestionPackV104(),
       ...getCrossSubjectQuestionPackV105(),
+      ...getOsymYokQuestionPack(),
     ]) {
       const topics = getTopicsForCatalogCourse(question.levelName, question.courseName);
-      const topicName = topics.length
-        ? topics[(question.topicIndex ?? 0) % topics.length]?.name ?? null
-        : null;
+      const topicName =
+        topics.find((topic) => topic.questionIds.includes(question.id))?.name ??
+        (topics.length ? topics[(question.topicIndex ?? 0) % topics.length]?.name ?? null : null);
       await insertQuestion({
         id: question.id,
         levelName: question.levelName,
@@ -235,6 +237,30 @@ export async function ensureEmbeddedQuestionBankSeeded() {
       String(EMBEDDED_PACKAGE_VERSION),
     );
   });
+}
+
+function hashString(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+/**
+ * Seçenek sırası soruya göre sabit ama rastgele görünür: doğru cevap her zaman
+ * A şıkkında durmaz, aynı soru her açılışta aynı sırada gelir.
+ */
+function shuffleOptions<T>(items: T[], seed: number) {
+  const result = [...items];
+  let state = seed || 1;
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    const swapIndex = state % (index + 1);
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+  }
+  return result;
 }
 
 async function hydrateQuestion(row: QuestionRow): Promise<BankQuestion | null> {
@@ -261,7 +287,10 @@ async function hydrateQuestion(row: QuestionRow): Promise<BankQuestion | null> {
   return {
     id: row.id,
     question: row.prompt,
-    options: options.map((option) => option.text),
+    options: shuffleOptions(
+      options.map((option) => option.text),
+      hashString(row.id),
+    ),
     correctAnswer: correct,
     explanation: row.explanation,
     difficulty: row.difficulty,

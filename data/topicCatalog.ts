@@ -1,3 +1,6 @@
+import { LEGACY_TOPIC_QUESTION_IDS_V11 } from '@/data/legacyQuestionBankV11';
+import { getOsymYokTopics } from '@/data/osymYokPack';
+
 export type TopicDefinition = {
   name: string;
   icon: string;
@@ -480,9 +483,26 @@ const TOPICS: Record<string, TopicDefinition[]> = {
   ],
 };
 
+// Yerleşik banka genişletmesi: mevcut konulara yeni soru id'lerini ekler.
+for (const [courseKey, topicMap] of Object.entries(LEGACY_TOPIC_QUESTION_IDS_V11)) {
+  const topics = TOPICS[courseKey];
+  if (!topics) continue;
+  for (const topic of topics) {
+    const extraIds = topicMap[topic.name];
+    if (!extraIds?.length) continue;
+    topic.questionIds = [...new Set([...topic.questionIds, ...extraIds])];
+  }
+}
+
+// ÖSYM ve YÖK paketlerinin konuları ayrı dosyalarda yaşar, burada birleşir.
+const EXTRA_TOPICS = getOsymYokTopics();
+
 export function getTopicsForCatalogCourse(levelName?: string, courseName?: string): TopicDefinition[] {
   if (!levelName || !courseName) return [];
-  return TOPICS[key(levelName, courseName)] ?? [];
+  const courseKey = key(levelName, courseName);
+  const base = TOPICS[courseKey] ?? [];
+  const extra = EXTRA_TOPICS[courseKey] ?? [];
+  return extra.length ? [...base, ...extra] : base;
 }
 
 export function getTopic(levelName?: string, courseName?: string, topicName?: string) {

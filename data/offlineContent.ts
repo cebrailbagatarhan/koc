@@ -1,3 +1,5 @@
+import { LEGACY_BANK_V11 } from '@/data/legacyQuestionBankV11';
+
 export type LessonSeed = {
   title: string;
   summary: string;
@@ -226,5 +228,8 @@ export function getLessonSeed(courseName?: string): LessonSeed | undefined {
 
 export function getQuizQuestions(levelName?: string, courseName?: string): QuizQuestion[] {
   if (!levelName || !courseName) return [];
-  return QUESTION_BANK[key(levelName, courseName)] ?? [];
+  const courseKey = key(levelName, courseName);
+  const expanded = LEGACY_BANK_V11[courseKey];
+  if (expanded?.length) return expanded;
+  return QUESTION_BANK[courseKey] ?? [];
 }

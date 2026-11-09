@@ -30,11 +30,28 @@ function distractNumbers(correct: number, steps = [1, -1, 2]): string[] {
 }
 
 function numericQuestion(input: Omit<EmbeddedQuestionSeed, 'options' | 'correctAnswer'> & { answer: number; distractors?: number[] }): EmbeddedQuestionSeed {
-  const values = input.distractors ?? distractNumbers(input.answer).map(Number);
-  const options = [input.answer, ...values.filter((value) => value !== input.answer)]
-    .slice(0, 4)
-    .map(String);
-  return { ...input, options, correctAnswer: String(input.answer) };
+  const answer = Number.isInteger(input.answer) ? input.answer : Number(input.answer.toFixed(2));
+  const candidates = [
+    answer,
+    ...(input.distractors ?? distractNumbers(answer).map(Number)),
+    answer + 1,
+    answer - 1,
+    answer + 2,
+    answer - 2,
+    answer + 5,
+    answer - 5,
+    answer + 10,
+  ];
+  const values: number[] = [];
+  for (const candidate of candidates) {
+    if (!Number.isFinite(candidate)) continue;
+    const value = Number.isInteger(candidate) ? candidate : Number(candidate.toFixed(2));
+    if (!values.includes(value)) values.push(value);
+  }
+  if (values.length < 4) {
+    throw new Error(`Could not build four unique options for ${input.id}`);
+  }
+  return { ...input, options: values.slice(0, 4).map(String), correctAnswer: String(answer) };
 }
 
 function makePrimaryMath(): EmbeddedQuestionSeed[] {
@@ -168,6 +185,7 @@ function makeMiddleMath(): EmbeddedQuestionSeed[] {
   });
   [35, 48, 72, 105, 126, 144, 180, 216].forEach((angle, index) => {
     const answer = 180 - angle;
+    if (!(answer > 0 && answer < 180)) return;
     result.push(numericQuestion({
       id: `v10-om-angle-${index + 1}`, levelName: 'Ortaokul', courseName: 'Matematik', topicIndex: 2,
       prompt: `Bir üçgende iki açının toplamı ${angle}° ise üçüncü açı kaç derecedir?`, answer,
@@ -276,11 +294,13 @@ function makeHighMath(): EmbeddedQuestionSeed[] {
   for (let x = -5; x <= 6; x += 1) {
     const a = (Math.abs(x) % 3) + 2;
     const b = x + 4;
+    if (b === 0) continue;
     const answer = a * x + b;
+    const sign = b < 0 ? '−' : '+';
     result.push(numericQuestion({
       id: `v10-lm-f-${x + 6}`, levelName: 'Lise', courseName: 'Matematik', topicIndex: 0,
-      prompt: `f(x) = ${a}x + ${b} olduğuna göre f(${x}) kaçtır?`, answer,
-      distractors: [answer + a, answer - b, answer + 1], explanation: `x yerine ${x} yazılır: ${a}·(${x}) + ${b} = ${answer}.`,
+      prompt: `f(x) = ${a}x ${sign} ${Math.abs(b)} olduğuna göre f(${x}) kaçtır?`, answer,
+      distractors: [answer + a, answer - 1, answer + a + 1], explanation: `x yerine ${x} yazılır: ${a}·(${x}) ${sign} ${Math.abs(b)} = ${answer}.`,
       difficulty: 'standard', questionKind: 'visual-choice', visual: { kind: 'number-line', min: -6, max: 8, points: [x], highlight: x },
     }));
   }
@@ -293,7 +313,7 @@ function makeHighMath(): EmbeddedQuestionSeed[] {
     result.push(numericQuestion({
       id: `v10-lm-root-${index + 1}`, levelName: 'Lise', courseName: 'Matematik', topicIndex: 1,
       prompt: `x² ${b < 0 ? '-' : '+'} ${Math.abs(b)}x + ${c} = 0 denkleminin kökleri toplamı kaçtır?`, answer,
-      distractors: [r1 * r2, answer + 1, Math.abs(b)], explanation: `Kökler toplamı -b/a = ${answer}.`, difficulty: 'hard', questionKind: 'multiple-choice',
+      distractors: [r1 * r2, answer + 2, answer + 3], explanation: `Kökler toplamı -b/a = ${answer}.`, difficulty: 'hard', questionKind: 'multiple-choice',
     }));
   });
   const probabilities = [[1, 6], [2, 6], [3, 8], [4, 10], [5, 12], [2, 5], [3, 10], [7, 20]];
@@ -328,7 +348,7 @@ function makePhysics(): EmbeddedQuestionSeed[] {
     const answer = Number(answerValue);
     return [0, 1].map((variant) => numericQuestion({
       id: `v10-lf-${index + 1}-${variant + 1}`, levelName: 'Lise', courseName: 'Fizik', topicIndex: index % 3,
-      prompt: String(prompt), answer, distractors: [answer + 5, Math.max(0, answer - 5), answer * 2], explanation: String(explanation),
+      prompt: String(prompt), answer, distractors: [answer + 5, Math.max(0, answer - 5), answer * 3], explanation: String(explanation),
       difficulty: variant === 0 ? 'standard' : 'hard', questionKind: variant === 0 ? 'multiple-choice' : 'visual-choice',
       visual: variant === 1 ? { kind: 'bars', labels: ['Veri', 'Sonuç'], values: [Math.max(1, Math.min(answer, 100)), Math.max(1, Math.min(answer / 2, 100))] } : undefined,
     }));
@@ -512,8 +532,37 @@ function makeAlesVerbal(): EmbeddedQuestionSeed[] {
   ]);
 }
 
+function normalizePrompt(prompt: string): string {
+  return prompt.replace(/\s+/g, ' ').trim().toLocaleLowerCase('tr');
+}
+
+function validateEmbeddedPack(questions: EmbeddedQuestionSeed[]): EmbeddedQuestionSeed[] {
+  const ids = new Set<string>();
+  const prompts = new Set<string>();
+  const result: EmbeddedQuestionSeed[] = [];
+  for (const question of questions) {
+    if (!question.id) throw new Error('Generated question is missing an id');
+    if (ids.has(question.id)) throw new Error(`Duplicate embedded question id: ${question.id}`);
+    ids.add(question.id);
+    if (!question.prompt.trim() || !question.explanation.trim()) {
+      throw new Error(`Incomplete embedded question: ${question.id}`);
+    }
+    if (question.options.length !== 4 || new Set(question.options).size !== 4) {
+      throw new Error(`Embedded question must have four unique options: ${question.id}`);
+    }
+    if (!question.options.includes(question.correctAnswer)) {
+      throw new Error(`Embedded question answer/options mismatch: ${question.id}`);
+    }
+    const key = normalizePrompt(question.prompt);
+    if (prompts.has(key)) continue;
+    prompts.add(key);
+    result.push(question);
+  }
+  return result;
+}
+
 export function getEmbeddedQuestionPackV10(): EmbeddedQuestionSeed[] {
-  return [
+  return validateEmbeddedPack([
     ...makePrimaryMath(),
     ...makePrimaryTurkish(),
     ...makeLifeKnowledge(),
@@ -532,5 +581,5 @@ export function getEmbeddedQuestionPackV10(): EmbeddedQuestionSeed[] {
     ...makeHighEnglish(),
     ...makeAlesNumeric(),
     ...makeAlesVerbal(),
-  ];
+  ]);
 }
