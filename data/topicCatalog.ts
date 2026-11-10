@@ -1,3 +1,4 @@
+import { BULK_TOPIC_QUESTION_IDS } from '@/data/bulkPack';
 import { LEGACY_TOPIC_QUESTION_IDS_V11 } from '@/data/legacyQuestionBankV11';
 import { getOsymYokTopics } from '@/data/osymYokPack';
 
@@ -483,19 +484,23 @@ const TOPICS: Record<string, TopicDefinition[]> = {
   ],
 };
 
-// Yerleşik banka genişletmesi: mevcut konulara yeni soru id'lerini ekler.
-for (const [courseKey, topicMap] of Object.entries(LEGACY_TOPIC_QUESTION_IDS_V11)) {
-  const topics = TOPICS[courseKey];
-  if (!topics) continue;
-  for (const topic of topics) {
-    const extraIds = topicMap[topic.name];
-    if (!extraIds?.length) continue;
-    topic.questionIds = [...new Set([...topic.questionIds, ...extraIds])];
+// ÖSYM ve YÖK paketlerinin konuları ayrı dosyalarda yaşar, burada birleşir.
+const EXTRA_TOPICS = getOsymYokTopics();
+
+/** Yeni soru id'lerini hem yerleşik hem paket konularına ekler. */
+function mergeTopicQuestionIds(source: Record<string, Record<string, string[]>>) {
+  for (const [courseKey, topicMap] of Object.entries(source)) {
+    const topics = [...(TOPICS[courseKey] ?? []), ...(EXTRA_TOPICS[courseKey] ?? [])];
+    for (const topic of topics) {
+      const extraIds = topicMap[topic.name];
+      if (!extraIds?.length) continue;
+      topic.questionIds = [...new Set([...topic.questionIds, ...extraIds])];
+    }
   }
 }
 
-// ÖSYM ve YÖK paketlerinin konuları ayrı dosyalarda yaşar, burada birleşir.
-const EXTRA_TOPICS = getOsymYokTopics();
+mergeTopicQuestionIds(LEGACY_TOPIC_QUESTION_IDS_V11);
+mergeTopicQuestionIds(BULK_TOPIC_QUESTION_IDS);
 
 export function getTopicsForCatalogCourse(levelName?: string, courseName?: string): TopicDefinition[] {
   if (!levelName || !courseName) return [];

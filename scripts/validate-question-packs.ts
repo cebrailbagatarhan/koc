@@ -46,6 +46,17 @@ const KNOWN_PACKS = [
   'data/packs/yokAkademik.ts',
   'data/packs/legacyIlkokulOrtaokul.ts',
   'data/packs/legacyLiseAles.ts',
+  'data/packs/bulkIlkokulMatematik.ts',
+  'data/packs/bulkIlkokulDiger.ts',
+  'data/packs/bulkOrtaokulMatematik.ts',
+  'data/packs/bulkOrtaokulTurkceSosyal.ts',
+  'data/packs/bulkOrtaokulFenIngilizce.ts',
+  'data/packs/bulkLiseMatematik.ts',
+  'data/packs/bulkLiseFizikKimya.ts',
+  'data/packs/bulkLiseDiger.ts',
+  'data/packs/bulkAles.ts',
+  'data/packs/bulkOsymTyt.ts',
+  'data/packs/bulkOsymAyt.ts',
 ];
 
 type LegacyQuestion = {
@@ -65,10 +76,22 @@ const args = process.argv.slice(2);
 const targets = args.length ? args : KNOWN_PACKS;
 
 const globalIds = new Map<string, string>();
+const templateCounts = new Map<string, number>();
 let errorCount = 0;
 let warnCount = 0;
 let totalQuestions = 0;
 const answerPositions = [0, 0, 0, 0];
+
+/** Sayıları ve noktalama işaretlerini atarak aynı kalıbı yakalar. */
+function templateKey(prompt: string) {
+  return prompt
+    .toLocaleLowerCase('tr-TR')
+    .replace(/\d+(?:[.,]\d+)?/g, '#')
+    .replace(/[^\p{L}#\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 90);
+}
 
 function fail(file: string, message: string) {
   errorCount += 1;
@@ -92,6 +115,10 @@ function checkQuestion(file: string, q: Question, topics: Topic[], index: number
 
   if (!q.prompt?.trim()) fail(file, `${where}: prompt boş`);
   if (q.prompt && q.prompt.trim().length < 12) warn(file, `${where}: prompt çok kısa`);
+  if (q.prompt?.trim()) {
+    const key = templateKey(q.prompt);
+    templateCounts.set(key, (templateCounts.get(key) ?? 0) + 1);
+  }
   if (!q.explanation?.trim()) fail(file, `${where}: explanation boş`);
   if (q.explanation && q.explanation.trim().length < 25) warn(file, `${where}: explanation çok kısa`);
   if (q.explanation && /^(doğru cevap|cevap)\s*[:：]?\s*\S+\.?$/i.test(q.explanation.trim())) {
@@ -237,8 +264,10 @@ async function validateFile(relative: string) {
 
   const topics = Array.isArray(module.topics) ? module.topics : [];
   const questions = Array.isArray(module.questions) ? module.questions : [];
+  const topicQuestionIds = module.topicQuestionIds ?? {};
+  const hasTopicMap = Object.keys(topicQuestionIds).length > 0;
 
-  if (!topics.length) fail(relative, 'topics dizisi yok/boş');
+  if (!topics.length && !hasTopicMap) fail(relative, 'ne topics ne topicQuestionIds var');
   if (!questions.length) fail(relative, 'questions dizisi yok/boş');
 
   const topicNames = new Set<string>();
@@ -272,11 +301,30 @@ async function validateFile(relative: string) {
       if (!questionIds.has(id)) fail(relative, `${topic.name}: questionIds içinde olmayan soru "${id}"`);
     }
   }
-  for (const question of questions) {
-    if (!seenInTopics.has(question.id)) fail(relative, `${question.id}: hiçbir konuya bağlı değil`);
+
+  const mappedIds = new Set<string>();
+  for (const [courseKey, topicMap] of Object.entries(topicQuestionIds)) {
+    if (!/^[^:]+::[^:]+$/.test(courseKey)) fail(relative, `topicQuestionIds: "${courseKey}" level::course değil`);
+    for (const [topicName, ids] of Object.entries(topicMap)) {
+      if (!ids.length) fail(relative, `${courseKey} / ${topicName}: boş id listesi`);
+      for (const id of ids) {
+        if (!questionIds.has(id)) fail(relative, `${courseKey} / ${topicName}: "${id}" bu dosyada yok`);
+        if (mappedIds.has(id)) fail(relative, `${id}: birden fazla konuya bağlanmış`);
+        mappedIds.add(id);
+      }
+    }
   }
 
-  const byTopic = topics.map((topic) => `${topic.name}=${topic.questionIds.length}`).join(', ');
+  const assigned = new Set([...seenInTopics, ...mappedIds]);
+  for (const question of questions) {
+    if (!assigned.has(question.id)) fail(relative, `${question.id}: hiçbir konuya bağlı değil`);
+  }
+
+  const byTopic = topics.length
+    ? topics.map((topic) => `${topic.name}=${topic.questionIds.length}`).join(', ')
+    : Object.entries(topicQuestionIds)
+        .map(([courseKey, map]) => `${courseKey.split('::')[1]}:${Object.values(map).reduce((sum, ids) => sum + ids.length, 0)}`)
+        .join(', ');
   const levels = [...new Set(questions.map((q) => `${q.levelName}/${q.courseName}`))].join(' + ');
   totalQuestions += questions.length;
   console.log(`  ✓ ${relative} — ${questions.length} soru · ${levels} · ${byTopic}`);
@@ -295,6 +343,15 @@ if (total > 0) {
   console.log(`\nDoğru cevap dağılımı: ${distribution}`);
   const worst = Math.max(...answerPositions) / total;
   if (worst > 0.4) warn('paketler', `doğru cevap dağılımı çarpık (${Math.round(worst * 100)}% tek şıkta)`);
+}
+
+const templates = [...templateCounts.entries()].sort((a, b) => b[1] - a[1]);
+if (templates.length) {
+  const biggest = templates[0];
+  console.log(`Şablon çeşitliliği: ${templates.length} kalıp · en kalabalık ${biggest[1]} varyant`);
+  if (biggest[1] > 40) {
+    warn('paketler', `en kalabalık şablon ${biggest[1]} kez tekrar ediyor → "${biggest[0].slice(0, 60)}"`);
+  }
 }
 
 console.log(`\nToplam: ${totalQuestions} soru · ${errorCount} hata · ${warnCount} uyarı`);

@@ -1,4 +1,5 @@
 import { getAllCourseKeys } from '@/data/courseCatalog';
+import { getBulkQuestionPack } from '@/data/bulkPack';
 import { getCrossSubjectQuestionPackV105 } from '@/data/crossSubjectQuestionFactoryV105';
 import { getDeterministicQuestionPackV104 } from '@/data/deterministicQuestionFactoryV104';
 import {
@@ -13,7 +14,7 @@ import { getTopicsForCatalogCourse } from '@/data/topicCatalog';
 import { getLearningDatabase } from '@/storage/database';
 
 const EMBEDDED_PACKAGE_ID = 'embedded-core';
-const EMBEDDED_PACKAGE_VERSION = 5;
+const EMBEDDED_PACKAGE_VERSION = 6;
 const SEED_META_KEY = 'embedded_question_bank_version';
 
 export type BankQuestion = QuizQuestion & {
@@ -210,6 +211,7 @@ export async function ensureEmbeddedQuestionBankSeeded() {
       ...getDeterministicQuestionPackV104(),
       ...getCrossSubjectQuestionPackV105(),
       ...getOsymYokQuestionPack(),
+      ...getBulkQuestionPack(),
     ]) {
       const topics = getTopicsForCatalogCourse(question.levelName, question.courseName);
       const topicName =
